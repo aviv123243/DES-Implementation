@@ -1,9 +1,13 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include "F.h"
+#include "include/F.h"
 extern const int E[48];
 extern const char S[8][64];
 extern const int P[32];
+
+uint64_t expand(uint32_t right);
+uint32_t keyed_substitution(uint64_t right);
+uint32_t PBox_transposition(uint32_t right);
 
 uint32_t F(uint32_t right,uint64_t subKey)
 {

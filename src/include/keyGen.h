@@ -1,5 +1,7 @@
+#define NUM_OF_SUBKEYS 16
+
 // PC-1: 64-bit input key → 56-bit output (C0 and D0)
-const int PC1[56] = {
+static const int PC1[56] = {
     57,49,41,33,25,17,9,
     1,58,50,42,34,26,18,
     10,2,59,51,43,35,27,
@@ -11,7 +13,7 @@ const int PC1[56] = {
 };
 
 // PC-2: 56-bit C||D → 48-bit subkey
-const int PC2[48] = {
+static const int PC2[48] = {
     14,17,11,24,1,5,
     3,28,15,6,21,10,
     23,19,12,4,26,8,
@@ -22,10 +24,11 @@ const int PC2[48] = {
     46,42,50,36,29,32
 };
 
-const int LEFT_SHIFTS[16] = {
+static const int LEFT_SHIFTS[16] = {
     1, 1, 2, 2,
     2, 2, 2, 2,
     1, 2, 2, 2,
     2, 2, 2, 1
 };
 
+void generate_sub_keys(uint64_t key,uint64_t subkeys[16]);
