@@ -3,24 +3,31 @@
 #include <stdio.h>
 #include "include/des.h"
 #include "include/keyGen.h"
+#include "include/modes.h"
 
 #include <inttypes.h>
 
-int main()
-{
-    uint64_t block = 0xAABBCCDD11223344;
+int main() {
+    uint64_t test = 0xaabbccdd11220000;
+
+    printf("test: 0x%016" PRIx64 "\n",test);
+    test = add_padding(test,6);
+    printf("pad: 0x%016" PRIx64 "\n",test);
+    char *text = "aaaaaaaabbbbbbbbcccccc";
+    char encrypted[128] = {0};
+    char decrypted[128] = {0};
+
     uint64_t key = 0x0123456789ABCDEF;
 
-    uint64_t subKeys[16];
-    generate_sub_keys(key, subKeys);
+    des_ECB_encrypt_string(text, encrypted, key);
 
-    uint64_t cipherBlock = des_block(block, subKeys, ENCRYPT);
+    // assume we know the output size
+    des_ECB_decrypt_string(encrypted, decrypted, 24, key); // 3 * 8 = 24 bytes
 
-    uint64_t decoded = des_block(cipherBlock, subKeys, DECRYPT);
-
-    printf("Plaintext:  0x%016" PRIx64 "\n", block);
-    printf("Ciphertext: 0x%016" PRIx64 "\n", cipherBlock);
-    printf("decoded: 0x%016" PRIx64 "\n", decoded);
+    printf("Original:  %s\n", text);
+    printf("Encrypted:  %s\n", encrypted);
+    printf("Decrypted: %s\n", decrypted);
 
     return 0;
 }
+

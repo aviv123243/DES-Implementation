@@ -76,7 +76,7 @@ void generate_sub_keys(uint64_t key, uint64_t subkeys[16])
 
     for (int i = 0; i < NUM_OF_SUBKEYS; i++)
     {
-        subkeys[i] = keyGen_next(&kg);  // correctly write into the caller's array
+        subkeys[i] = keyGen_next(&kg);  
     }
 }
 

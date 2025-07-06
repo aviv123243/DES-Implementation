@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "include/F.h"
 extern const int E[48];
-extern const char S[8][64];
+extern const char S[8][4][16];
 extern const int P[32];
 
 uint64_t expand(uint32_t right);
@@ -53,7 +53,7 @@ uint32_t keyed_substitution(uint64_t right)
         int col = (chunk >> 1) & 0x0F;                     // bits 2–5
 
         // Lookup S-box output (4 bits)
-        uint8_t s_out = S[i][row * 16 + col] & 0x0F;
+        uint8_t s_out = S[i][row][col] & 0x0F;
 
         // Place into result (MSB-first)
         res |= s_out << (28 - 4 * i);
