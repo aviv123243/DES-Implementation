@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include <stdint.h>
-#include "include/F.h"
-#include "include/keyGen.h"
-#include "include/des.h"
+#include "des.h"
+#include "../f_function/f.h"
+#include "../subkey_genaration/subKeyGen.h"
 
 uint64_t permute(uint64_t block, const int table[64])
 {

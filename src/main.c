@@ -2,9 +2,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "include/des.h"
-#include "include/keyGen.h"
-#include "include/modes.h"
+
+#include "modes/modes.h"
 
 #include <inttypes.h>
 
@@ -51,4 +50,3 @@ void testStringEncryption(uint64_t key)
 
     printf("\nDecrypted: %s\n", decrypted);
 }
-

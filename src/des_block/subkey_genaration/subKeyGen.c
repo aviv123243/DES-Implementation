@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include "include/keyGen.h"
+#include "subKeyGen.h"
 
 extern const int PC1[56];
 extern const int PC2[48];
@@ -8,12 +8,12 @@ extern const int LEFT_SHIFTS[NUM_OF_SUBKEYS];
 
 uint64_t permuted_choice2(uint32_t Ci, uint32_t Di);
 
-typedef struct keyGenType
+typedef struct subKeyGenType
 {
     uint32_t Ci; // 28-bit
     uint32_t Di; // 28-bit
     int i;
-} keyGen;
+} subKeyGen;
 
 uint32_t circular_left_shift_28(uint32_t chunk, int nshifts)
 {
@@ -50,33 +50,33 @@ uint64_t permuted_choice2(uint32_t Ci, uint32_t Di)
     return subkey;
 }
 
-void keyGen_init(keyGen *kg, uint64_t key)
+void keyGen_init(subKeyGen *skg, uint64_t key)
 {
-    permuted_choice1(key, &kg->Ci, &kg->Di);  
+    permuted_choice1(key, &skg->Ci, &skg->Di);  
 
-    kg->i = 0;
+    skg->i = 0;
 }
 
-uint64_t keyGen_next(keyGen *kg) {
+uint64_t keyGen_next(subKeyGen *skg) {
     //shift the two halfs
-    kg->Ci = circular_left_shift_28(kg->Ci,LEFT_SHIFTS[kg->i]);
-    kg->Di = circular_left_shift_28(kg->Di,LEFT_SHIFTS[kg->i]);
+    skg->Ci = circular_left_shift_28(skg->Ci,LEFT_SHIFTS[skg->i]);
+    skg->Di = circular_left_shift_28(skg->Di,LEFT_SHIFTS[skg->i]);
 
     //incrament i
-    kg->i++;
+    skg->i++;
 
     //return the permuted Choice 2
-    return permuted_choice2(kg->Ci,kg->Di)   ;
+    return permuted_choice2(skg->Ci,skg->Di)   ;
 }
 
 void generate_sub_keys(uint64_t key, uint64_t subkeys[16])
 {
-    keyGen kg;
-    keyGen_init(&kg, key);
+    subKeyGen skg;
+    keyGen_init(&skg, key);
 
     for (int i = 0; i < NUM_OF_SUBKEYS; i++)
     {
-        subkeys[i] = keyGen_next(&kg);  
+        subkeys[i] = keyGen_next(&skg);  
     }
 }
 

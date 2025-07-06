@@ -2,6 +2,7 @@
     "files.associations": {
         "des.h": "c",
         "keygen.h": "c",
-        "f.h": "c"
+        "f.h": "c",
+        "subkeygen.h": "c"
     }
 }

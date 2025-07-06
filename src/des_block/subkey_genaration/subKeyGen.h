@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #define NUM_OF_SUBKEYS 16
 
 // PC-1: 64-bit input key → 56-bit output (C0 and D0)

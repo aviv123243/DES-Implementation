@@ -2,37 +2,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-#include "include/des.h"
-#include "include/keyGen.h"
-#include "include/modes.h"
+#include "modes.h"
+#include "../des_block/main_encryption/des.h"
+#include "../des_block/subkey_genaration/subKeyGen.h"
 
 #include "inttypes.h"
-
-uint64_t add_padding(uint8_t tailingBytes[],int numOfBytes)
-{
-    uint8_t bytes[8] = {0};
-    uint64_t res;
-
-    memcpy(bytes, tailingBytes, numOfBytes);  
-
-    uint8_t padValue = SIZE_OF_BLOCK_BYTES - numOfBytes;
-
-    for (int i = numOfBytes; i < SIZE_OF_BLOCK_BYTES; i++) {
-        bytes[i] = padValue;  
-    }
-
-    memcpy(&res, bytes, SIZE_OF_BLOCK_BYTES);
-
-    return res;
-}
-
-int get_padding_len(uint64_t block) {
-    uint8_t bytes[8];
-
-    memcpy(bytes,&block,SIZE_OF_BLOCK_BYTES);
-
-    return bytes[SIZE_OF_BLOCK_BYTES - 1];  
-}
 
 //encrypting a string in ECB mode
 //returning the length of the ciphertext
@@ -145,7 +119,6 @@ void des_ECB_encrypt_file(const char *src, const char *dst, uint64_t key)
     fclose(srcP);
     fclose(dstP);
 }
-
 
 void des_ECB_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 {

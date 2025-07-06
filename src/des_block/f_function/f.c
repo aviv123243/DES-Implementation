@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include "include/F.h"
+#include "f.h"
 extern const int E[48];
 extern const char S[8][4][16];
 extern const int P[32];
