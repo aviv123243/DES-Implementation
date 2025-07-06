@@ -27,15 +27,15 @@ uint64_t add_padding(uint8_t tailingBytes[],int numOfBytes)
 }
 
 int get_padding_len(uint64_t block) {
-    printf("padded block to remove pad 0x%08" PRIX64 "\n",block);
     uint8_t bytes[8];
 
     memcpy(bytes,&block,SIZE_OF_BLOCK_BYTES);
 
-    printf("0x%08" PRIX8 "\n",bytes[SIZE_OF_BLOCK_BYTES - 1]);
     return bytes[SIZE_OF_BLOCK_BYTES - 1];  
 }
 
+//encrypting a string in ECB mode
+//returning the length of the ciphertext
 int des_ECB_encrypt_string(const char *str, char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
@@ -43,31 +43,41 @@ int des_ECB_encrypt_string(const char *str, char *dst, uint64_t key)
 
     int len = strlen(str);
     int i = 0;
-    int dstIndex = 0;
 
-    while (i < len) {
-        uint8_t blockBuffer[8] = {0};
-        int remaining = len - i;
-        int chunkSize = (remaining >= 8) ? 8 : remaining;
+    uint64_t encrypted;
 
-        memcpy(blockBuffer, str + i, chunkSize);
+    int lenOfPrefectBlocks = (len/8)*8;
 
+    while (i < lenOfPrefectBlocks) {
         uint64_t block;
-        memcpy(&block, blockBuffer, 8);
+        
+        memcpy(&block, str + i, 8);
 
-        if (chunkSize < 8) {
-            block = add_padding(blockBuffer, chunkSize);
-            printf("padded block: 0x%016" PRIx64 "\n",block);
-        }
+        encrypted = des_block(block, subKeys, ENCRYPT);
 
-        uint64_t encrypted = des_block(block, subKeys, ENCRYPT);
-        memcpy(dst + dstIndex, &encrypted, 8);
+        memcpy(dst + i, &encrypted, SIZE_OF_BLOCK_BYTES);
 
-        dstIndex += 8;
-        i += chunkSize;
+        i += SIZE_OF_BLOCK_BYTES;
     }
 
-    return len + SIZE_OF_BLOCK_BYTES;
+    uint8_t blockBuffer[8] = {0};
+
+    int numOfTailingBytes = len - lenOfPrefectBlocks;
+
+    //load the tailing bytes into a buffer
+    memcpy(blockBuffer,str + i,numOfTailingBytes);
+
+    //create the last block (with the padding)
+    uint64_t lastBlock = add_padding(blockBuffer,numOfTailingBytes);
+
+    //encrypt te last block
+    encrypted = des_block(lastBlock,subKeys,ENCRYPT);
+
+    //add it to the ciphertext
+    memcpy(dst + i, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+    //return the length
+    return i + SIZE_OF_BLOCK_BYTES;
 }
 
 void des_ECB_decrypt_string(const char *cipher, char *dst, int length, uint64_t key)
@@ -75,14 +85,15 @@ void des_ECB_decrypt_string(const char *cipher, char *dst, int length, uint64_t 
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
 
-    int i;
     int dstIndex = 0;
 
-    for (i = 0; i < length; i += 8) {
+    for (int i = 0; i < length; i += 8) {
         uint64_t block;
+
         memcpy(&block, cipher + i, 8);
 
         uint64_t decrypted = des_block(block, subKeys, DECRYPT);
+ 
         memcpy(dst + dstIndex, &decrypted, 8);
 
         dstIndex += 8;

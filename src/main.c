@@ -13,9 +13,6 @@
 int main() {
     uint8_t tail[] = {'a','b'};
 
-    uint64_t block = add_padding(tail,0);
-
-    printf("0x%016" PRIX64 "\n",block);
     const char *plaintext = "Hello DES!";
     char encrypted[64] = {0};
     char decrypted[64] = {0};
@@ -24,10 +21,14 @@ int main() {
 
     printf("Plaintext: %s\n", plaintext);
 
-    des_ECB_encrypt_string(plaintext, encrypted, key);
-    des_ECB_decrypt_string(encrypted, decrypted, strlen(plaintext) + SIZE_OF_BLOCK_BYTES, key);
+    int newLen = des_ECB_encrypt_string(plaintext, encrypted, key);
 
-    printf("Decrypted: %s\n", decrypted);
+    printf("encrypted: ");
+    fwrite(encrypted,sizeof(char),newLen,stdout);
+
+    des_ECB_decrypt_string(encrypted, decrypted, newLen, key);
+
+    printf("\nDecrypted: %s\n", decrypted);
 
     return 0;
 }
