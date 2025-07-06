@@ -1,40 +1,42 @@
-#include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
+#include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #include "include/des.h"
 #include "include/keyGen.h"
+#include "include/modes.h"
 
-#include <inttypes.h>
+#include "inttypes.h"
 
-#define SIZE_OF_BLOCK_BYTES 8
-
-uint64_t add_padding(uint64_t blockToPad, int numOfExistingBytes)
+uint64_t add_padding(uint8_t tailingBytes[],int numOfBytes)
 {
-    uint8_t bytes[8];
-    memcpy(bytes, &blockToPad, 8);  
+    uint8_t bytes[8] = {0};
+    uint64_t res;
 
-    uint8_t padValue = SIZE_OF_BLOCK_BYTES - numOfExistingBytes;
+    memcpy(bytes, tailingBytes, numOfBytes);  
 
-    for (int i = 0; i < padValue; i++) {
+    uint8_t padValue = SIZE_OF_BLOCK_BYTES - numOfBytes;
+
+    for (int i = numOfBytes; i < SIZE_OF_BLOCK_BYTES; i++) {
         bytes[i] = padValue;  
     }
 
-    uint64_t result;
-    memcpy(&result, bytes, 8);
-    return result;
+    memcpy(&res, bytes, SIZE_OF_BLOCK_BYTES);
+
+    return res;
 }
 
+int get_padding_len(uint64_t block) {
+    printf("padded block to remove pad 0x%08" PRIX64 "\n",block);
+    uint8_t bytes[8];
 
+    memcpy(bytes,&block,SIZE_OF_BLOCK_BYTES);
 
-int get_padding_length(uint64_t paddedBlock)
-{
-    uint64_t lastByteMask = 0xff;
-
-    return paddedBlock & lastByteMask;
+    printf("0x%08" PRIX8 "\n",bytes[SIZE_OF_BLOCK_BYTES - 1]);
+    return bytes[SIZE_OF_BLOCK_BYTES - 1];  
 }
 
-char *des_ECB_encrypt_string(const char *str, char *dst, uint64_t key)
+int des_ECB_encrypt_string(const char *str, char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -54,7 +56,7 @@ char *des_ECB_encrypt_string(const char *str, char *dst, uint64_t key)
         memcpy(&block, blockBuffer, 8);
 
         if (chunkSize < 8) {
-            block = add_padding(block, chunkSize);
+            block = add_padding(blockBuffer, chunkSize);
             printf("padded block: 0x%016" PRIx64 "\n",block);
         }
 
@@ -65,11 +67,10 @@ char *des_ECB_encrypt_string(const char *str, char *dst, uint64_t key)
         i += chunkSize;
     }
 
-    return dst;
+    return len + SIZE_OF_BLOCK_BYTES;
 }
 
-
-char *des_ECB_decrypt_string(const char *cipher, char *dst, int length, uint64_t key)
+void des_ECB_decrypt_string(const char *cipher, char *dst, int length, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -89,14 +90,9 @@ char *des_ECB_decrypt_string(const char *cipher, char *dst, int length, uint64_t
 
     // Remove padding length from final block
     uint64_t lastBlock;
-    memcpy(&lastBlock, dst + dstIndex - 8, 8);
-    int padLen = get_padding_length(lastBlock);
+    memcpy(&lastBlock, dst + dstIndex - SIZE_OF_BLOCK_BYTES, SIZE_OF_BLOCK_BYTES);
+    int padLen = get_padding_len(lastBlock);
 
-    memset(dst + dstIndex - 8, 0, SIZE_OF_BLOCK_BYTES-padLen);
-
-    // Null-terminate after stripping padding
     int actualLength = dstIndex - padLen;
     dst[actualLength] = '\0';
-
-    return dst;
 }

@@ -1,31 +1,32 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include "include/des.h"
 #include "include/keyGen.h"
 #include "include/modes.h"
 
 #include <inttypes.h>
 
+
+
 int main() {
-    uint64_t test = 0xaabbccdd11220000;
+    uint8_t tail[] = {'a','b'};
 
-    printf("test: 0x%016" PRIx64 "\n",test);
-    test = add_padding(test,6);
-    printf("pad: 0x%016" PRIx64 "\n",test);
-    char *text = "aaaaaaaabbbbbbbbcccccc";
-    char encrypted[128] = {0};
-    char decrypted[128] = {0};
+    uint64_t block = add_padding(tail,0);
 
-    uint64_t key = 0x0123456789ABCDEF;
+    printf("0x%016" PRIX64 "\n",block);
+    const char *plaintext = "Hello DES!";
+    char encrypted[64] = {0};
+    char decrypted[64] = {0};
 
-    des_ECB_encrypt_string(text, encrypted, key);
+    uint64_t key = 0x133457799BBCDFF1;
 
-    // assume we know the output size
-    des_ECB_decrypt_string(encrypted, decrypted, 24, key); // 3 * 8 = 24 bytes
+    printf("Plaintext: %s\n", plaintext);
 
-    printf("Original:  %s\n", text);
-    printf("Encrypted:  %s\n", encrypted);
+    des_ECB_encrypt_string(plaintext, encrypted, key);
+    des_ECB_decrypt_string(encrypted, decrypted, strlen(plaintext) + SIZE_OF_BLOCK_BYTES, key);
+
     printf("Decrypted: %s\n", decrypted);
 
     return 0;
