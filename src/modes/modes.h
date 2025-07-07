@@ -24,4 +24,9 @@ void des_ECB_decrypt_file(const char *cipher, const char * dst, uint64_t key);
 void des_CBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t key);
 void des_CBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint64_t key);
 
+//PCBC 
+void des_PCBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t key);
+void des_PCBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint64_t key);
+
+
 

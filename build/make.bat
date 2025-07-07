@@ -8,5 +8,6 @@ gcc ^
   ..\src\key_iv\key_iv.c ^
   ..\src\modes\ECB.c ^
   ..\src\modes\CBC.c ^
+  ..\src\modes\PCBC.c ^
   ..\src\pkcs7_padding\pkcs7.c ^
   -o out
