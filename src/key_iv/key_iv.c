@@ -5,6 +5,8 @@
 
 #include "key_iv.h"
 
+uint64_t generate_random_64();
+
 uint64_t generate_random_key()
 {
     srand(time(NULL) ^ clock());
@@ -31,6 +33,16 @@ uint64_t generate_random_key()
 }
 
 uint64_t generate_random_iv()
+{
+    return generate_random_64();
+}
+
+uint64_t generate_random_nonce()
+{
+    return generate_random_64();
+}
+
+uint64_t generate_random_64()
 {
     srand(time(NULL) ^ clock());
 

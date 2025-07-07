@@ -24,15 +24,15 @@ int main() {
     return 0;
 }
 
-void testFileEncryption(uint64_t key,uint64_t iv)
+void testFileEncryption(uint64_t key)
 {
     printf("encrypting...\n");
 
-    des_PCBC_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",iv,key);
+    des_OFB_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",key);
 
     printf("decrypting...\n");
 
-    des_PCBC_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",iv,key);
+    des_OFB_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",key);
 }
 
 void testStringEncryption(uint64_t key)

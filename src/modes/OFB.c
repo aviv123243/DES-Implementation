@@ -2,7 +2,7 @@
 
 #include "modes.h"
 
-void des_CFB_encrypt_file(const char *src, const char *dst, uint64_t key)
+void des_OFB_encrypt_file(const char *src, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -30,7 +30,7 @@ void des_CFB_encrypt_file(const char *src, const char *dst, uint64_t key)
 
         uint64_t encrypted = encryptedPrev ^ block;
 
-        prevBlock = encrypted;
+        prevBlock = encryptedPrev;
 
         fwrite(&encrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
     }
@@ -39,7 +39,7 @@ void des_CFB_encrypt_file(const char *src, const char *dst, uint64_t key)
     fclose(dstP);
 }
 
-void des_CFB_decrypt_file(const char *cipher, const char *dst, uint64_t key)
+void des_OFB_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -65,7 +65,7 @@ void des_CFB_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 
         bytesRead = fread(&nextBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
 
-        prevBlock = currentBlock;
+        prevBlock = decryptedPrev;
 
         uint64_t decrypted = decryptedPrev ^ currentBlock;
 

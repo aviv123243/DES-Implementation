@@ -7,6 +7,7 @@
 
 #include "../des_block/main_encryption/des.h"
 #include "../des_block/subkey_genaration/subKeyGen.h"
+#include "../key_iv/key_iv.h"
 #include "../pkcs7_padding/pkcs7.h"
 
 #include "inttypes.h"
@@ -21,16 +22,21 @@ void des_ECB_encrypt_file(const char *src, const char * dst, uint64_t key);
 void des_ECB_decrypt_file(const char *cipher, const char * dst, uint64_t key);
 
 //CBC
-void des_CBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t key);
-void des_CBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint64_t key);
+void des_CBC_encrypt_file(const char *src, const char *dst, uint64_t key);
+void des_CBC_decrypt_file(const char *cipher, const char *dst, uint64_t key);
 
 //PCBC 
-void des_PCBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t key);
-void des_PCBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint64_t key);
+void des_PCBC_encrypt_file(const char *src, const char *dst, uint64_t key);
+void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t key);
 
 //CFB
-void des_CFB_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t key);
-void des_CFB_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint64_t key);
+void des_CFB_encrypt_file(const char *src, const char *dst, uint64_t key);
+void des_CFB_decrypt_file(const char *cipher, const char *dst, uint64_t key);
+
+//OFB
+void des_OFB_encrypt_file(const char *src, const char *dst, uint64_t key);
+void des_OFB_decrypt_file(const char *cipher, const char *dst, uint64_t key);
+
 
 
 

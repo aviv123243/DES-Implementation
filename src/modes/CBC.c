@@ -1,6 +1,6 @@
 #include "modes.h"
 
-void des_CBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t key)
+void des_CBC_encrypt_file(const char *src, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -13,7 +13,10 @@ void des_CBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t
     uint8_t blockBuffer[8];
     size_t bytesRead;
 
-    uint64_t prevBlock = iv;
+    uint64_t prevBlock = generate_random_iv();
+
+    //writing the iv
+    fwrite(&prevBlock,sizeof(prevBlock),1,dstP);
 
     while ((bytesRead = fread(blockBuffer, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, srcP)) == SIZE_OF_BLOCK_BYTES)
     {
@@ -45,7 +48,7 @@ void des_CBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t
     fclose(dstP);
 }
 
-void des_CBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint64_t key)
+void des_CBC_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -57,8 +60,11 @@ void des_CBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint6
         return;
 
     uint64_t currentBlock, nextBlock;
-    uint64_t prevBlock = iv;
+    uint64_t prevBlock;
     size_t bytesRead;
+
+    //reading the iv
+    fread(&prevBlock, sizeof(uint64_t), 1, cipherP);
     
     bytesRead = fread(&currentBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
 
@@ -72,7 +78,9 @@ void des_CBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint6
 
         prevBlock = currentBlock;
 
-        if (bytesRead < SIZE_OF_BLOCK_BYTES)
+        int isLast = (bytesRead == 0);
+
+        if (isLast)
         {
             // This is the last block, strip padding
             int padLen = get_padding_len(decrypted);

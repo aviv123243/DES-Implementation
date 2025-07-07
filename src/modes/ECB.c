@@ -134,7 +134,9 @@ void des_ECB_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 
         uint64_t decrypted = des_block(currentBlock, subKeys, DECRYPT);
 
-        if (bytesRead < SIZE_OF_BLOCK_BYTES)
+        int isLast = (bytesRead == 0);
+
+        if (isLast)
         {
             // This is the last block, strip padding
             int padLen = get_padding_len(decrypted);

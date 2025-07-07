@@ -8,3 +8,4 @@
 
 uint64_t generate_random_key();
 uint64_t generate_random_iv();
+uint64_t generate_random_nonce();

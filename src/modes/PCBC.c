@@ -1,7 +1,7 @@
 #include "modes.h"
 
 /*NOT WORKING*/
-void des_PCBC_encrypt_file(const char *src, const char *dst, uint64_t iv, uint64_t key)
+void des_PCBC_encrypt_file(const char *src, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -15,7 +15,10 @@ void des_PCBC_encrypt_file(const char *src, const char *dst, uint64_t iv, uint64
     uint8_t blockBuffer[8];
     size_t bytesRead;
 
-    uint64_t prevBlock = iv;
+    uint64_t prevBlock = generate_random_iv();
+
+    //writing the iv
+    fwrite(&prevBlock,sizeof(prevBlock),1,dstP);
 
     while ((bytesRead = fread(blockBuffer, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, srcP)) == SIZE_OF_BLOCK_BYTES)
     {
@@ -47,7 +50,7 @@ void des_PCBC_encrypt_file(const char *src, const char *dst, uint64_t iv, uint64
     fclose(dstP);
 }
 
-void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t iv, uint64_t key)
+void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -59,11 +62,14 @@ void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t iv, uin
         return;
 
     uint64_t currentBlock, nextBlock;
-    uint64_t prevBlock = iv;
+    uint64_t prevBlock;
     int bytesRead;
     int isLast;
 
-    bytesRead = fread(&currentBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
+    //reading the iv
+    fread(&prevBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
+
+    bytesRead = fread(&currentBlock, sizeof(uint64_t), 1, cipherP);
 
     while (bytesRead == SIZE_OF_BLOCK_BYTES)
     {
@@ -72,7 +78,7 @@ void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t iv, uin
         uint64_t decrypted = des_block(currentBlock, subKeys, DECRYPT);
 
         uint64_t tempPrev = currentBlock ^ decrypted;
-        
+
         decrypted ^= prevBlock;
 
         prevBlock = tempPrev;

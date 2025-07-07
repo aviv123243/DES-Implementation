@@ -10,5 +10,6 @@ gcc ^
   ..\src\modes\CBC.c ^
   ..\src\modes\PCBC.c ^
   ..\src\modes\CFB.c ^
+  ..\src\modes\OFB.c ^
   ..\src\pkcs7_padding\pkcs7.c ^
   -o out
