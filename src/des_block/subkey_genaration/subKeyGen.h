@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdint.h>
 
 #define NUM_OF_SUBKEYS 16

@@ -4,32 +4,33 @@
 #include <string.h>
 
 #include "modes/modes.h"
+#include "key_iv/key_iv.h"
 
 #include <inttypes.h>
 
-void testFileEncryption(uint64_t key);
+void testFileEncryption(uint64_t key,uint64_t iv);
 void testStringEncryption(uint64_t key);
 
 
 int main() {
 
-    uint64_t key = 0x133457799BBCDFF1;
+    // uint64_t key = 0x133457799BBCDFF1;
 
-    testFileEncryption(key);
+    testFileEncryption(generate_random_key(),generate_random_iv());
     
 
     return 0;
 }
 
-void testFileEncryption(uint64_t key)
+void testFileEncryption(uint64_t key,uint64_t iv)
 {
     printf("encrypting...\n");
 
-    des_ECB_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",key);
+    des_CBC_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",iv,key);
 
     printf("decrypting...\n");
 
-    des_ECB_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",key);
+    des_CBC_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",iv,key);
 }
 
 void testStringEncryption(uint64_t key)

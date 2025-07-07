@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdint.h>
 
 static const int E[48] = {
