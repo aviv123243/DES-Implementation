@@ -5,11 +5,14 @@
 
 #include "modes/modes.h"
 #include "key_iv/key_iv.h"
+#include "des_block/subkey_genaration/subKeyGen.h"
 
 #include <inttypes.h>
 
 void testFileEncryption(uint64_t key,uint64_t iv);
 void testStringEncryption(uint64_t key);
+void testBlockEncryption(uint64_t key);
+
 
 
 int main() {
@@ -17,7 +20,6 @@ int main() {
     // uint64_t key = 0x133457799BBCDFF1;
 
     testFileEncryption(generate_random_key(),generate_random_iv());
-    
 
     return 0;
 }
@@ -26,11 +28,11 @@ void testFileEncryption(uint64_t key,uint64_t iv)
 {
     printf("encrypting...\n");
 
-    des_CBC_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",iv,key);
+    des_PCBC_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",iv,key);
 
     printf("decrypting...\n");
 
-    des_CBC_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",iv,key);
+    des_PCBC_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",iv,key);
 }
 
 void testStringEncryption(uint64_t key)
@@ -50,4 +52,22 @@ void testStringEncryption(uint64_t key)
     des_ECB_decrypt_string(encrypted, decrypted, newLen, key);
 
     printf("\nDecrypted: %s\n", decrypted);
+}
+
+void testBlockEncryption(uint64_t key)
+{
+    uint64_t subKeys[16];
+    generate_sub_keys(key, subKeys);
+
+    uint64_t block = 0xAABBCCDD11223344;
+
+    uint64_t cipherBlock = des_block(block, subKeys, ENCRYPT);
+
+    uint64_t decoded = des_block(cipherBlock, subKeys, DECRYPT);
+
+    printf("Plaintext:  0x%016" PRIx64 "\n", block);
+    printf("Ciphertext: 0x%016" PRIx64 "\n", cipherBlock);
+    printf("decoded: 0x%016" PRIx64 "\n", decoded);
+
+    
 }
