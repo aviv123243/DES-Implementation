@@ -40,6 +40,9 @@ void des_CFB_encrypt_file(const char *src, const char *dst, uint64_t key);
 void des_CFB_decrypt_file(const char *cipher, const char *dst, uint64_t key);
 
 //OFB
+int des_OFB_encrypt_string(const char *str, char *dst, uint64_t key);
+void des_OFB_decrypt_string(const char *cipher, char *dst, int length, uint64_t key);
+
 void des_OFB_encrypt_file(const char *src, const char *dst, uint64_t key);
 void des_OFB_decrypt_file(const char *cipher, const char *dst, uint64_t key);
 

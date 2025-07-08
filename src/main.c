@@ -41,13 +41,13 @@ void testStringEncryption(uint64_t key)
 
     printf("Plaintext: %s\n", plaintext);
 
-    int newLen = des_CRT_encrypt_string(plaintext, encrypted, key);
+    int newLen = des_OFB_encrypt_string(plaintext, encrypted, key);
 
     printf("encrypted: ");
 
     fwrite(encrypted,sizeof(char),newLen,stdout);
 
-    des_CRT_decrypt_string(encrypted, decrypted, newLen, key);
+    des_OFB_decrypt_string(encrypted, decrypted, newLen, key);
 
     printf("\nDecrypted: %s\n", decrypted);
 }

@@ -1,6 +1,6 @@
 #include "modes.h"
 
-/*NOT WORKING*/
+
 void des_PCBC_encrypt_file(const char *src, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
