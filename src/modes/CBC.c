@@ -1,5 +1,104 @@
 #include "modes.h"
 
+int des_CBC_encrypt_string(const char *str, char *dst, uint64_t key)
+{
+    uint64_t subKeys[16];
+    generate_sub_keys(key, subKeys);
+
+    int len = strlen(str);
+    int srcIndex = 0;
+    int dstIndex = 0;
+
+    uint64_t encrypted;
+
+    uint64_t prevBlock = generate_random_iv();
+    memcpy(dst + dstIndex,&prevBlock ,sizeof(prevBlock));
+    dstIndex += IV_SIZE_BYTES;
+
+    int lenOfPrefectBlocks = (len / SIZE_OF_BLOCK_BYTES) * SIZE_OF_BLOCK_BYTES;
+
+    while (srcIndex < lenOfPrefectBlocks)
+    {
+        uint64_t block;
+
+        memcpy(&block, str + srcIndex, SIZE_OF_BLOCK_BYTES);
+
+        block ^= prevBlock;
+
+        encrypted = des_block(block, subKeys, ENCRYPT);
+
+        prevBlock = encrypted;
+
+        memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+        srcIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    uint8_t blockBuffer[8] = {0};
+
+    int numOfTailingBytes = len - lenOfPrefectBlocks;
+
+    // load the tailing bytes into a buffer
+    memcpy(blockBuffer, str + srcIndex, numOfTailingBytes);
+
+    // create the last block (with the padding)
+    uint64_t lastBlock = add_padding(blockBuffer, numOfTailingBytes);
+
+    lastBlock ^= prevBlock;
+
+    // encrypt te last block
+    encrypted = des_block(lastBlock, subKeys, ENCRYPT);
+
+    // add it to the ciphertext
+    memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+    // return the length
+    return dstIndex + SIZE_OF_BLOCK_BYTES;
+}
+
+void des_CBC_decrypt_string(const char *cipher, char *dst, int length, uint64_t key)
+{
+    uint64_t subKeys[16];
+
+    generate_sub_keys(key, subKeys);
+
+    int srcIndex = 0;
+    int dstIndex = 0;
+    
+    uint64_t prevBlock;
+
+    memcpy(&prevBlock,cipher + srcIndex,sizeof(prevBlock));
+    srcIndex += IV_SIZE_BYTES;
+
+    for (; srcIndex < length; srcIndex += SIZE_OF_BLOCK_BYTES)
+    {
+        uint64_t block;
+
+        memcpy(&block, cipher + srcIndex, 8);
+
+        uint64_t decrypted = des_block(block, subKeys, DECRYPT);
+
+        decrypted ^= prevBlock;
+
+        prevBlock = block;        
+
+        memcpy(dst + dstIndex, &decrypted, 8);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    uint64_t lastBlock;
+    memcpy(&lastBlock, dst + dstIndex - SIZE_OF_BLOCK_BYTES, SIZE_OF_BLOCK_BYTES);
+
+    // getting the actual size of the last block (without padding)
+    int padLen = get_padding_len(lastBlock);
+
+    // putting a null terminator at the end of the original plaintext
+    int actualLength = dstIndex - padLen; 
+    dst[actualLength] = 0;
+}
+
 void des_CBC_encrypt_file(const char *src, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];

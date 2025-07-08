@@ -17,7 +17,7 @@ int main() {
 
     // uint64_t key = 0x133457799BBCDFF1;
 
-    testFileEncryption(generate_random_key());
+    testStringEncryption(generate_random_key());
 
     return 0;
 }
@@ -41,13 +41,13 @@ void testStringEncryption(uint64_t key)
 
     printf("Plaintext: %s\n", plaintext);
 
-    int newLen = des_ECB_encrypt_string(plaintext, encrypted, key);
+    int newLen = des_CBC_encrypt_string(plaintext, encrypted, key);
 
     printf("encrypted: ");
 
     fwrite(encrypted,sizeof(char),newLen,stdout);
 
-    des_ECB_decrypt_string(encrypted, decrypted, newLen, key);
+    des_CBC_decrypt_string(encrypted, decrypted, newLen, key);
 
     printf("\nDecrypted: %s\n", decrypted);
 }

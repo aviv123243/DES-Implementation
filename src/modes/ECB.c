@@ -12,13 +12,13 @@ int des_ECB_encrypt_string(const char *str, char *dst, uint64_t key)
 
     uint64_t encrypted;
 
-    int lenOfPrefectBlocks = (len / 8) * 8;
+    int lenOfPrefectBlocks = (len / SIZE_OF_BLOCK_BYTES) * SIZE_OF_BLOCK_BYTES;
 
     while (i < lenOfPrefectBlocks)
     {
         uint64_t block;
 
-        memcpy(&block, str + i, 8);
+        memcpy(&block, str + i, SIZE_OF_BLOCK_BYTES);
 
         encrypted = des_block(block, subKeys, ENCRYPT);
 
@@ -55,7 +55,7 @@ void des_ECB_decrypt_string(const char *cipher, char *dst, int length, uint64_t 
 
     int dstIndex = 0;
 
-    for (int i = 0; i < length; i += 8)
+    for (int i = 0; i < length; i += SIZE_OF_BLOCK_BYTES)
     {
         uint64_t block;
 
@@ -65,7 +65,7 @@ void des_ECB_decrypt_string(const char *cipher, char *dst, int length, uint64_t 
 
         memcpy(dst + dstIndex, &decrypted, 8);
 
-        dstIndex += 8;
+        dstIndex += SIZE_OF_BLOCK_BYTES;
     }
 
     uint64_t lastBlock;
