@@ -13,7 +13,7 @@ void des_OFB_encrypt_file(const char *src, const char *dst, uint64_t key)
     if (!srcP || !dstP)
         return;
 
-    uint8_t blockBuffer[8];
+    uint64_t block;
     size_t bytesRead;
 
     uint64_t prevBlock = generate_random_iv();
@@ -21,12 +21,9 @@ void des_OFB_encrypt_file(const char *src, const char *dst, uint64_t key)
     //writing the iv
     fwrite(&prevBlock,sizeof(prevBlock),1,dstP);
 
-    while ((bytesRead = fread(blockBuffer, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, srcP)) == SIZE_OF_BLOCK_BYTES)
+    while ((bytesRead = fread(&block, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, srcP)) == SIZE_OF_BLOCK_BYTES)
     {
         uint64_t encryptedPrev = des_block(prevBlock, subKeys, ENCRYPT);
-
-        uint64_t block;
-        memcpy(&block, blockBuffer, SIZE_OF_BLOCK_BYTES);
 
         uint64_t encrypted = encryptedPrev ^ block;
 
@@ -50,20 +47,16 @@ void des_OFB_decrypt_file(const char *cipher, const char *dst, uint64_t key)
     if (!cipherP || !dstP)
         return;
 
-    uint64_t currentBlock, nextBlock;
+    uint64_t currentBlock;
     uint64_t prevBlock;
     size_t bytesRead;
 
     //reading the iv
     fread(&prevBlock, sizeof(uint64_t), 1, cipherP);
 
-    bytesRead = fread(&currentBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
-
-    while (bytesRead == SIZE_OF_BLOCK_BYTES)
+    while (fread(&currentBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP) == SIZE_OF_BLOCK_BYTES)
     {
         uint64_t decryptedPrev = des_block(prevBlock, subKeys, ENCRYPT);
-
-        bytesRead = fread(&nextBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
 
         prevBlock = decryptedPrev;
 
@@ -71,8 +64,6 @@ void des_OFB_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 
         //no need to habdle padding for this mode beacude of xor
         fwrite(&decrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
-
-        currentBlock = nextBlock;
     }
 
     fclose(cipherP);

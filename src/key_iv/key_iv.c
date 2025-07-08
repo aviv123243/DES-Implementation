@@ -34,16 +34,7 @@ uint64_t generate_random_key()
 
 uint64_t generate_random_iv()
 {
-    return generate_random_64();
-}
-
-uint64_t generate_random_nonce()
-{
-    return generate_random_64();
-}
-
-uint64_t generate_random_64()
-{
+    //random 64 bit number
     srand(time(NULL) ^ clock());
 
     uint64_t iv = 0;
@@ -58,4 +49,28 @@ uint64_t generate_random_64()
     }
 
     return iv;
+}
+
+uint32_t generate_random_nonce()
+{
+    //random 32 bit number
+    srand(time(NULL) ^ clock());
+
+    uint32_t nonce = 0;
+
+    for (int i = 0; i < NONCE_SIZE_BYTES; i++)
+    {
+        //genarating the next byte
+        uint8_t randByte = rand() & LAST_BYTE_MASK;
+
+        //appending it to the nonce
+        nonce |= ((uint32_t)randByte << i*8);
+    }
+
+    return nonce;
+}
+
+uint64_t generate_random_64()
+{
+    
 }

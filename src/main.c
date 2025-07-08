@@ -9,17 +9,15 @@
 
 #include <inttypes.h>
 
-void testFileEncryption(uint64_t key,uint64_t iv);
+void testFileEncryption(uint64_t key);
 void testStringEncryption(uint64_t key);
 void testBlockEncryption(uint64_t key);
-
-
 
 int main() {
 
     // uint64_t key = 0x133457799BBCDFF1;
 
-    testFileEncryption(generate_random_key(),generate_random_iv());
+    testFileEncryption(generate_random_key());
 
     return 0;
 }
@@ -28,16 +26,16 @@ void testFileEncryption(uint64_t key)
 {
     printf("encrypting...\n");
 
-    des_OFB_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",key);
+    des_CFB_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",key);
 
     printf("decrypting...\n");
 
-    des_OFB_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",key);
+    des_CFB_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",key);
 }
 
 void testStringEncryption(uint64_t key)
 {
-    const char *plaintext = "Hello DES!";
+    const char *plaintext = "DES DES 123";
     char encrypted[64] = {0};
     char decrypted[64] = {0};
 

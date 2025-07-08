@@ -37,6 +37,12 @@ void des_CFB_decrypt_file(const char *cipher, const char *dst, uint64_t key);
 void des_OFB_encrypt_file(const char *src, const char *dst, uint64_t key);
 void des_OFB_decrypt_file(const char *cipher, const char *dst, uint64_t key);
 
+//CTR
+void des_CTR_encrypt_file(const char *src, const char *dst, uint64_t key);
+void des_CTR_decrypt_file(const char *cipher, const char *dst, uint64_t key);
+
+
+
 
 
 

@@ -67,9 +67,9 @@ void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t key)
     int isLast;
 
     //reading the iv
-    fread(&prevBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
+    fread(&prevBlock, sizeof(uint64_t), 1, cipherP);
 
-    bytesRead = fread(&currentBlock, sizeof(uint64_t), 1, cipherP);
+    bytesRead = fread(&currentBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
 
     while (bytesRead == SIZE_OF_BLOCK_BYTES)
     {
