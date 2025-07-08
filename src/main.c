@@ -26,11 +26,11 @@ void testFileEncryption(uint64_t key)
 {
     printf("encrypting...\n");
 
-    des_CFB_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",key);
+    des_PCBC_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",key);
 
     printf("decrypting...\n");
 
-    des_CFB_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",key);
+    des_PCBC_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",key);
 }
 
 void testStringEncryption(uint64_t key)
@@ -41,13 +41,13 @@ void testStringEncryption(uint64_t key)
 
     printf("Plaintext: %s\n", plaintext);
 
-    int newLen = des_OFB_encrypt_string(plaintext, encrypted, key);
+    int newLen = des_PCBC_encrypt_string(plaintext, encrypted, key);
 
     printf("encrypted: ");
 
     fwrite(encrypted,sizeof(char),newLen,stdout);
 
-    des_OFB_decrypt_string(encrypted, decrypted, newLen, key);
+    des_PCBC_decrypt_string(encrypted, decrypted, newLen, key);
 
     printf("\nDecrypted: %s\n", decrypted);
 }
