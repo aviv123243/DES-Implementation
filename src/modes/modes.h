@@ -33,6 +33,9 @@ void des_PCBC_encrypt_file(const char *src, const char *dst, uint64_t key);
 void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t key);
 
 //CFB
+int des_CFB_encrypt_string(const char *str, char *dst, uint64_t key);
+void des_CFB_decrypt_string(const char *cipher, char *dst, int length, uint64_t key);
+
 void des_CFB_encrypt_file(const char *src, const char *dst, uint64_t key);
 void des_CFB_decrypt_file(const char *cipher, const char *dst, uint64_t key);
 
