@@ -2,7 +2,7 @@
 
 uint64_t build_input_block(uint32_t nonce, uint32_t counter);
 
-int des_CRT_encrypt_string(const char *str, char *dst, uint64_t key)
+int des_CTR_encrypt_string(const char *str, char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -43,7 +43,7 @@ int des_CRT_encrypt_string(const char *str, char *dst, uint64_t key)
     return dstIndex + SIZE_OF_BLOCK_BYTES;
 }
 
-void des_CRT_decrypt_string(const char *cipher, char *dst, int length, uint64_t key)
+void des_CTR_decrypt_string(const char *cipher, char *dst, int length, uint64_t key)
 {
     uint64_t subKeys[16];
 
@@ -173,7 +173,6 @@ void des_CTR_decrypt_file(const char *cipher, const char *dst, uint64_t key)
     fclose(cipherP);
     fclose(dstP);
 }
-
 
 uint64_t build_input_block(uint32_t nonce, uint32_t counter)
 {

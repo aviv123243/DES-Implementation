@@ -13,10 +13,10 @@ EXPORTS
     des_CFB_decrypt_string @12
     des_CFB_encrypt_file @13
     des_CFB_encrypt_string @14
-    des_CRT_decrypt_string @15
-    des_CRT_encrypt_string @16
-    des_CTR_decrypt_file @17
-    des_CTR_encrypt_file @18
+    des_CTR_decrypt_file @15
+    des_CTR_decrypt_string @16
+    des_CTR_encrypt_file @17
+    des_CTR_encrypt_string @18
     des_ECB_decrypt_file @19
     des_ECB_decrypt_string @20
     des_ECB_encrypt_file @21

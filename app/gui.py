@@ -16,9 +16,9 @@ class DESApp:
         """Configure DLL function prototypes."""
         string_funcs = [
             "des_ECB_encrypt_string", "des_CBC_encrypt_string", "des_CFB_encrypt_string",
-            "des_OFB_encrypt_string", "des_CRT_encrypt_string", "des_PCBC_encrypt_string",
+            "des_OFB_encrypt_string", "des_CTR_encrypt_string", "des_PCBC_encrypt_string",
             "des_ECB_decrypt_string", "des_CBC_decrypt_string", "des_CFB_decrypt_string",
-            "des_OFB_decrypt_string", "des_CRT_decrypt_string", "des_PCBC_decrypt_string"
+            "des_OFB_decrypt_string", "des_CTR_decrypt_string", "des_PCBC_decrypt_string"
         ]
         for func in string_funcs:
             f = getattr(self.dll, func)
@@ -51,6 +51,10 @@ class DESApp:
         notebook.add(file_tab, text="File Encryption")
         self.create_file_tab(file_tab)
 
+        # Status Label
+        self.status_label = tk.Label(self.root, text="", fg="green")
+        self.status_label.pack(pady=(0, 5))
+
     def create_text_tab(self, parent):
         """Create text encryption tab."""
         tk.Label(parent, text="Mode:").pack()
@@ -74,6 +78,8 @@ class DESApp:
         tk.Label(parent, text="Output:").pack()
         self.text_output = tk.Text(parent, height=4, width=40, state="disabled")
         self.text_output.pack()
+
+        tk.Button(parent, text="Copy Output", command=self.copy_output).pack(pady=5)
 
     def create_file_tab(self, parent):
         """Create file encryption tab."""
@@ -135,9 +141,18 @@ class DESApp:
                 messagebox.showerror("Error", "Select input and output files")
                 return
             func(input_file.encode('utf-8'), output_file.encode('utf-8'), key)
-            messagebox.showinfo("Success", f"Output saved to {output_file}")
+            self.status_label.config(text="✔ File processed!")
+            self.root.after(2000, lambda: self.status_label.config(text=""))
         except Exception as e:
             messagebox.showerror("Error", f"Invalid input or key: {str(e)}")
+
+    def copy_output(self):
+        """Copy output text to clipboard and show status label."""
+        self.root.clipboard_clear()
+        self.root.clipboard_append(self.text_output.get("1.0", tk.END).strip())
+        self.root.update()
+        self.status_label.config(text="✔ Copied!")
+        self.root.after(2000, lambda: self.status_label.config(text=""))
 
 def main():
     root = tk.Tk()
