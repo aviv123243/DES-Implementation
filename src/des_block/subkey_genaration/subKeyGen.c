@@ -192,7 +192,7 @@ void defuse_subkeys(uint64_t subkeys_output[NUM_OF_SUBKEYS], nodePtr nodes_in[NU
 
         uint64_t sum_of_children = sum_children_values(current_node);
 
-        subkeys_output[i] = (current_node->val * sum_of_children) & LAST_48_BITS_MASK;
+        subkeys_output[i] = (current_node->val * ) & LAST_48_BITS_MASK;
     }
 }
 
