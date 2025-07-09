@@ -75,7 +75,7 @@ uint64_t keyGen_next(subKeyGen *skg)
     return permuted_choice2(skg->Ci, skg->Di);
 }
 
-void generate_sub_plain_keys(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS])
+void generate_sub_keys_plain(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS])
 {
     subKeyGen skg;
     keyGen_init(&skg, key);
@@ -87,94 +87,125 @@ void generate_sub_plain_keys(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS])
 }
 
 // Simple hash to determine child relation
-int hash(uint64_t a, uint64_t b) {
-    return ((a % 2) == (b % 2)) ? 0 : 1;
+int hash(uint64_t a, uint64_t b)
+{
+    return ((a % 7) == (b % 13)) ? 0 : 1;
 }
 
-//generate dag graph based on the keys
-//returns 1 if the dag was created and allocated properly
-//else 0;
-int generate_dag(uint64_t subkeys[NUM_OF_SUBKEYS], nodePtr nodes_out[NUM_OF_SUBKEYS]) {
-    for (int i = 0; i < NUM_OF_SUBKEYS; i++) {
+void init_graph(uint64_t subkeys[NUM_OF_SUBKEYS],nodePtr nodes_out[NUM_OF_SUBKEYS])
+{
+    for (int i = 0; i < NUM_OF_SUBKEYS; i++)
+    {
         nodes_out[i] = (nodePtr)malloc(sizeof(node));
-        if (!nodes_out[i]) {
+        if (!nodes_out[i])
+        {
             perror("Failed to allocate node");
-            for (int k = 0; k < i; k++) free(nodes_out[k]);
-            return 0;
+            for (int k = 0; k < i; k++)
+                free(nodes_out[k]);
+            
+            exit(-1);
         }
+
         nodes_out[i]->val = subkeys[i];
         nodes_out[i]->children = NULL;
         nodes_out[i]->numChildren = 0;
     }
+}
+
+void free_graph(nodePtr subkey_nodes[NUM_OF_SUBKEYS])
+{
+    for (int i = 0; i < NUM_OF_SUBKEYS; i++)
+    {
+        free(subkey_nodes[i]->children);
+        free(subkey_nodes[i]);
+    }
+}
+ 
+// generate dag graph based on the keys
+// returns 1 if the dag was created and allocated properly
+// else 0;
+void generate_graph(uint64_t subkeys[NUM_OF_SUBKEYS], nodePtr nodes_out[NUM_OF_SUBKEYS])
+{   
+    init_graph(subkeys,nodes_out);
 
     int childCounts[NUM_OF_SUBKEYS] = {0};
-    for (int i = 0; i < NUM_OF_SUBKEYS - 1; i++) {
-        for (int j = i + 1; j < NUM_OF_SUBKEYS; j++) {
-            if (hash(subkeys[i], subkeys[j]) == 0) {
+
+    for (int i = 0; i < NUM_OF_SUBKEYS; i++)
+    {
+        for (int j = 0; j < NUM_OF_SUBKEYS; j++)
+        {
+            if (hash(subkeys[i], subkeys[j]) == 0)
+            {
                 childCounts[i]++;
             }
         }
     }
 
-    for (int i = 0; i < NUM_OF_SUBKEYS; i++) {
-        if (childCounts[i] > 0) {
+    for (int i = 0; i < NUM_OF_SUBKEYS; i++)
+    {
+        if (childCounts[i] > 0)
+        {
             nodes_out[i]->children = (nodePtr *)malloc(sizeof(nodePtr) * childCounts[i]);
-            if (!nodes_out[i]->children) {
+            if (!nodes_out[i]->children)
+            {
                 perror("Failed to allocate children array");
-                for (int k = 0; k <= i; k++) {
+                for (int k = 0; k <= i; k++)
+                {
                     free(nodes_out[k]->children);
                     free(nodes_out[k]);
                 }
-                return 0;
+
+                exit(-1);
             }
         }
     }
 
     int fillIndex[NUM_OF_SUBKEYS] = {0};
-    for (int i = 0; i < NUM_OF_SUBKEYS - 1; i++) {
-        for (int j = i + 1; j < NUM_OF_SUBKEYS; j++) {
-            if (hash(subkeys[i], subkeys[j]) == 0) {
+    for (int i = 0; i < NUM_OF_SUBKEYS - 1; i++)
+    {
+        for (int j = i + 1; j < NUM_OF_SUBKEYS; j++)
+        {
+            if (hash(subkeys[i], subkeys[j]) == 0)
+            {
                 nodes_out[i]->children[fillIndex[i]++] = nodes_out[j];
                 nodes_out[i]->numChildren++;
             }
         }
     }
-
-    return 1;
 }
 
-uint64_t sum_children_values(nodePtr current_node) {
+uint64_t sum_children_values(nodePtr current_node)
+{
     uint64_t sum = 0;
-    for (int i = 0; i < current_node->numChildren; i++) {
+    for (int i = 0; i < current_node->numChildren; i++)
+    {
         sum += current_node->children[i]->val;
     }
     return sum;
 }
 
-void generate_sub_keys_helper(uint64_t subkeys_output[NUM_OF_SUBKEYS], nodePtr nodes_in[NUM_OF_SUBKEYS]) {
-    for (int i = 0; i < NUM_OF_SUBKEYS; i++) {
+void defuse_subkeys(uint64_t subkeys_output[NUM_OF_SUBKEYS], nodePtr nodes_in[NUM_OF_SUBKEYS])
+{
+    for (int i = 0; i < NUM_OF_SUBKEYS; i++)
+    {
         nodePtr current_node = nodes_in[i];
+
         uint64_t sum_of_children = sum_children_values(current_node);
+
         subkeys_output[i] = (current_node->val * sum_of_children) & LAST_48_BITS_MASK;
     }
 }
 
-void generate_sub_keys(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS]) {
+void generate_sub_keys(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS])
+{
     uint64_t plain_subkeys[NUM_OF_SUBKEYS];
     nodePtr subkey_nodes[NUM_OF_SUBKEYS];
 
-    generate_sub_plain_keys(key, plain_subkeys);
+    generate_sub_keys_plain(key, plain_subkeys);
 
-    if (!generate_dag(plain_subkeys, subkey_nodes)) {
-        fprintf(stderr, "Error: DAG generation failed.\n");
-        memset(subkeys, 0, sizeof(uint64_t) * NUM_OF_SUBKEYS);
-        return;
-    }
+    generate_graph(plain_subkeys, subkey_nodes);
+   
+    defuse_subkeys(subkeys, subkey_nodes);
 
-    generate_sub_keys_helper(subkeys, subkey_nodes);
-
-    for (int i = 0; i < NUM_OF_SUBKEYS; i++) {
-        free(subkey_nodes[i]->children);
-        free(subkey_nodes[i]);
-    }
+    free_graph(subkey_nodes);
 }
