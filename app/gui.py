@@ -1,142 +1,148 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import ttk, filedialog, messagebox
 import ctypes
-import os
+from ctypes import c_char_p, c_uint64, c_int
 
-# Load DLL
-dll_path = os.path.join(os.path.dirname(__file__), "..", "bin", "des.dll")
-des = ctypes.CDLL(dll_path)
+class DESApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("DES Encryption")
+        self.root.geometry("500x500")
+        self.dll = ctypes.WinDLL("../bin/des.dll")
+        self.setup_dll()
+        self.create_widgets()
 
-# Set up random key function from DLL
-des.generate_random_key.argtypes = []
-des.generate_random_key.restype = ctypes.c_uint64
+    def setup_dll(self):
+        """Configure DLL function prototypes."""
+        string_funcs = [
+            "des_ECB_encrypt_string", "des_CBC_encrypt_string", "des_CFB_encrypt_string",
+            "des_OFB_encrypt_string", "des_CRT_encrypt_string", "des_PCBC_encrypt_string",
+            "des_ECB_decrypt_string", "des_CBC_decrypt_string", "des_CFB_decrypt_string",
+            "des_OFB_decrypt_string", "des_CRT_decrypt_string", "des_PCBC_decrypt_string"
+        ]
+        for func in string_funcs:
+            f = getattr(self.dll, func)
+            f.argtypes = [c_char_p, c_char_p, c_int, c_uint64] if "decrypt" in func else [c_char_p, c_char_p, c_uint64]
+            f.restype = None if "decrypt" in func else c_int
 
-def generate_random_key_hex():
-    return f"{des.generate_random_key():016X}"
+        file_funcs = [
+            "des_ECB_encrypt_file", "des_CBC_encrypt_file", "des_CFB_encrypt_file",
+            "des_OFB_encrypt_file", "des_CTR_encrypt_file", "des_PCBC_encrypt_file",
+            "des_ECB_decrypt_file", "des_CBC_decrypt_file", "des_CFB_decrypt_file",
+            "des_OFB_decrypt_file", "des_CTR_decrypt_file", "des_PCBC_decrypt_file"
+        ]
+        for func in file_funcs:
+            getattr(self.dll, func).argtypes = [c_char_p, c_char_p, c_uint64]
 
-# Modes and their file/string functions
-class Mode:
-    def __init__(self, name, file_enc, file_dec, str_enc, str_dec):
-        self.name = name
-        self.file_enc = file_enc
-        self.file_dec = file_dec
-        self.str_enc = str_enc
-        self.str_dec = str_dec
+        self.dll.generate_random_key.restype = c_uint64
 
-modes = [
-    Mode("ECB", des.des_ECB_encrypt_file, des.des_ECB_decrypt_file, des.des_ECB_encrypt_string, des.des_ECB_decrypt_string),
-    Mode("CBC", des.des_CBC_encrypt_file, des.des_CBC_decrypt_file, des.des_CBC_encrypt_string, des.des_CBC_decrypt_string),
-    Mode("PCBC", des.des_PCBC_encrypt_file, des.des_PCBC_decrypt_file, des.des_PCBC_encrypt_string, des.des_PCBC_decrypt_string),
-    Mode("CFB", des.des_CFB_encrypt_file, des.des_CFB_decrypt_file, des.des_CFB_encrypt_string, des.des_CFB_decrypt_string),
-    Mode("OFB", des.des_OFB_encrypt_file, des.des_OFB_decrypt_file, des.des_OFB_encrypt_string, des.des_OFB_decrypt_string),
-    Mode("CTR", des.des_CTR_encrypt_file, des.des_CTR_decrypt_file, des.des_CRT_encrypt_string, des.des_CRT_decrypt_string),
-]
-mode_map = {m.name: m for m in modes}
+    def create_widgets(self):
+        """Create GUI with two tabs."""
+        notebook = ttk.Notebook(self.root)
+        notebook.pack(pady=10, fill="both", expand=True)
 
-# Set types for file functions
-for m in modes:
-    for func in [m.file_enc, m.file_dec]:
-        func.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint64]
-        func.restype = None
+        # Text Tab
+        text_tab = ttk.Frame(notebook)
+        notebook.add(text_tab, text="Text Encryption")
+        self.create_text_tab(text_tab)
 
-    for func in [m.str_enc, m.str_dec]:
-        func.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_uint64]
-        func.restype = ctypes.c_int
+        # File Tab
+        file_tab = ttk.Frame(notebook)
+        notebook.add(file_tab, text="File Encryption")
+        self.create_file_tab(file_tab)
 
-# GUI
-root = tk.Tk()
-root.title("DES Encryptor")
-root.geometry("600x500")
+    def create_text_tab(self, parent):
+        """Create text encryption tab."""
+        tk.Label(parent, text="Mode:").pack()
+        self.text_mode = tk.StringVar(value="ECB")
+        ttk.Combobox(parent, textvariable=self.text_mode, values=["ECB", "CBC", "CFB", "OFB", "CTR", "PCBC"], state="readonly").pack()
 
-notebook = ttk.Notebook(root)
-notebook.pack(fill=tk.BOTH, expand=True)
+        tk.Label(parent, text="Key (hex):").pack()
+        self.text_key = tk.Entry(parent)
+        self.text_key.pack()
+        tk.Button(parent, text="Generate Key", command=lambda: self.text_key.insert(0, hex(self.dll.generate_random_key()))).pack(pady=5)
 
-# === File Tab ===
-file_tab = ttk.Frame(notebook)
-notebook.add(file_tab, text="File")
+        self.text_op = tk.StringVar(value="Encrypt")
+        tk.Radiobutton(parent, text="Encrypt", variable=self.text_op, value="Encrypt").pack()
+        tk.Radiobutton(parent, text="Decrypt", variable=self.text_op, value="Decrypt").pack()
 
-file_mode = tk.StringVar(value="ECB")
-file_key = tk.StringVar(value="1122334455667788")
-file_input = tk.StringVar()
-file_output = tk.StringVar()
+        tk.Label(parent, text="Input:").pack()
+        self.text_input = tk.Text(parent, height=4, width=40)
+        self.text_input.pack()
+        tk.Button(parent, text="Execute", command=self.execute_text).pack(pady=5)
 
-ttks = ttk
+        tk.Label(parent, text="Output:").pack()
+        self.text_output = tk.Text(parent, height=4, width=40, state="disabled")
+        self.text_output.pack()
 
-# File widgets
-ttks.Label(file_tab, text="Mode:").grid(row=0, column=0, sticky=tk.W)
-ttks.Combobox(file_tab, textvariable=file_mode, values=list(mode_map.keys()), state="readonly").grid(row=0, column=1, sticky=tk.EW)
+    def create_file_tab(self, parent):
+        """Create file encryption tab."""
+        tk.Label(parent, text="Mode:").pack()
+        self.file_mode = tk.StringVar(value="ECB")
+        ttk.Combobox(parent, textvariable=self.file_mode, values=["ECB", "CBC", "CFB", "OFB", "CTR", "PCBC"], state="readonly").pack()
 
-ttks.Label(file_tab, text="Key (hex):").grid(row=1, column=0, sticky=tk.W)
-ttks.Entry(file_tab, textvariable=file_key).grid(row=1, column=1, sticky=tk.EW)
-ttks.Button(file_tab, text="Random", command=lambda: file_key.set(generate_random_key_hex())).grid(row=1, column=2)
+        tk.Label(parent, text="Key (hex):").pack()
+        self.file_key = tk.Entry(parent)
+        self.file_key.pack()
+        tk.Button(parent, text="Generate Key", command=lambda: self.file_key.insert(0, hex(self.dll.generate_random_key()))).pack(pady=5)
 
-ttks.Label(file_tab, text="Input File:").grid(row=2, column=0, sticky=tk.W)
-ttks.Entry(file_tab, textvariable=file_input).grid(row=2, column=1, sticky=tk.EW)
-ttks.Button(file_tab, text="Browse", command=lambda: file_input.set(filedialog.askopenfilename())).grid(row=2, column=2)
+        self.file_op = tk.StringVar(value="Encrypt")
+        tk.Radiobutton(parent, text="Encrypt", variable=self.file_op, value="Encrypt").pack()
+        tk.Radiobutton(parent, text="Decrypt", variable=self.file_op, value="Decrypt").pack()
 
-ttks.Label(file_tab, text="Output File:").grid(row=3, column=0, sticky=tk.W)
-ttks.Entry(file_tab, textvariable=file_output).grid(row=3, column=1, sticky=tk.EW)
-ttks.Button(file_tab, text="Browse", command=lambda: file_output.set(filedialog.asksaveasfilename())).grid(row=3, column=2)
+        tk.Label(parent, text="Input File:").pack()
+        self.input_file = tk.StringVar()
+        tk.Entry(parent, textvariable=self.input_file, width=40, state="readonly").pack()
+        tk.Button(parent, text="Browse", command=lambda: self.input_file.set(filedialog.askopenfilename())).pack()
 
-def file_op(encrypt):
-    mode = mode_map[file_mode.get()]
-    key = int(file_key.get(), 16)
-    try:
-        func = mode.file_enc if encrypt else mode.file_dec
-        func(file_input.get().encode(), file_output.get().encode(), key)
-        messagebox.showinfo("Success", "Done")
-    except Exception as e:
-        messagebox.showerror("Error", str(e))
+        tk.Label(parent, text="Output File:").pack()
+        self.output_file = tk.StringVar()
+        tk.Entry(parent, textvariable=self.output_file, width=40, state="readonly").pack()
+        tk.Button(parent, text="Browse", command=lambda: self.output_file.set(filedialog.asksaveasfilename(defaultextension=".txt"))).pack()
 
-ttks.Button(file_tab, text="Encrypt", command=lambda: file_op(True)).grid(row=4, column=1, sticky=tk.E, pady=10)
-ttks.Button(file_tab, text="Decrypt", command=lambda: file_op(False)).grid(row=4, column=2, sticky=tk.W)
+        tk.Button(parent, text="Execute", command=self.execute_file).pack(pady=5)
 
-for i in range(3): file_tab.columnconfigure(i, weight=1)
+    def execute_text(self):
+        """Execute text encryption/decryption."""
+        try:
+            key = int(self.text_key.get(), 16)
+            func_name = f"des_{self.text_mode.get()}_{'encrypt' if self.text_op.get() == 'Encrypt' else 'decrypt'}_string"
+            func = getattr(self.dll, func_name)
+            input_text = self.text_input.get("1.0", tk.END).strip().encode('latin1')
+            output_buffer = ctypes.create_string_buffer(1024)
+            if self.text_op.get() == "Encrypt":
+                length = func(input_text, output_buffer, key)
+                result = output_buffer.raw[:length].decode('latin1')
+            else:
+                func(input_text, output_buffer, len(input_text), key)
+                result = output_buffer.value.decode('utf-8', errors='ignore')
+            self.text_output.config(state="normal")
+            self.text_output.delete("1.0", tk.END)
+            self.text_output.insert("1.0", result)
+            self.text_output.config(state="disabled")
+        except Exception as e:
+            messagebox.showerror("Error", f"Invalid input or key: {str(e)}")
 
-# === String Tab ===
-string_tab = ttk.Frame(notebook)
-notebook.add(string_tab, text="String")
+    def execute_file(self):
+        """Execute file encryption/decryption."""
+        try:
+            key = int(self.file_key.get(), 16)
+            func_name = f"des_{self.file_mode.get()}_{'encrypt' if self.file_op.get() == 'Encrypt' else 'decrypt'}_file"
+            func = getattr(self.dll, func_name)
+            input_file = self.input_file.get()
+            output_file = self.output_file.get()
+            if not input_file or not output_file:
+                messagebox.showerror("Error", "Select input and output files")
+                return
+            func(input_file.encode('utf-8'), output_file.encode('utf-8'), key)
+            messagebox.showinfo("Success", f"Output saved to {output_file}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Invalid input or key: {str(e)}")
 
-string_mode = tk.StringVar(value="ECB")
-string_key = tk.StringVar(value="133457799BBCDFF1")
-plaintext = tk.Text(string_tab, height=5)
-ciphertext = tk.Text(string_tab, height=5)
+def main():
+    root = tk.Tk()
+    app = DESApp(root)
+    root.mainloop()
 
-# String widgets
-ttks.Label(string_tab, text="Mode:").grid(row=0, column=0, sticky=tk.W)
-ttks.Combobox(string_tab, textvariable=string_mode, values=list(mode_map.keys()), state="readonly").grid(row=0, column=1, sticky=tk.EW)
-
-ttks.Label(string_tab, text="Key (hex):").grid(row=1, column=0, sticky=tk.W)
-ttks.Entry(string_tab, textvariable=string_key).grid(row=1, column=1, sticky=tk.EW)
-ttks.Button(string_tab, text="Random", command=lambda: string_key.set(generate_random_key_hex())).grid(row=1, column=2)
-
-ttks.Label(string_tab, text="Plaintext:").grid(row=2, column=0, sticky=tk.W)
-plaintext.grid(row=3, column=0, columnspan=3, sticky=tk.EW)
-
-ttks.Label(string_tab, text="Ciphertext:").grid(row=4, column=0, sticky=tk.W)
-ciphertext.grid(row=5, column=0, columnspan=3, sticky=tk.EW)
-
-def string_encrypt():
-    mode = mode_map[string_mode.get()]
-    key = int(string_key.get(), 16)
-    src = plaintext.get("1.0", tk.END).strip().encode()
-    buf = ctypes.create_string_buffer(1024)
-    newlen = mode.str_enc(src, buf, len(src), key)
-    ciphertext.delete("1.0", tk.END)
-    ciphertext.insert("1.0", buf.raw[:newlen])
-
-def string_decrypt():
-    mode = mode_map[string_mode.get()]
-    key = int(string_key.get(), 16)
-    src = ciphertext.get("1.0", tk.END).strip().encode()
-    buf = ctypes.create_string_buffer(1024)
-    newlen = mode.str_dec(src, buf, len(src), key)
-    plaintext.delete("1.0", tk.END)
-    plaintext.insert("1.0", buf.raw[:newlen].decode(errors="ignore"))
-
-ttks.Button(string_tab, text="Encrypt", command=string_encrypt).grid(row=6, column=1, sticky=tk.E, pady=10)
-ttks.Button(string_tab, text="Decrypt", command=string_decrypt).grid(row=6, column=2, sticky=tk.W)
-
-for i in range(3): string_tab.columnconfigure(i, weight=1)
-
-root.mainloop()
+if __name__ == "__main__":
+    main()
