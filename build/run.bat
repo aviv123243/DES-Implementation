@@ -1,4 +1,4 @@
 @echo off
 
 call make.bat
-out.exe
+..\bin\out.exe

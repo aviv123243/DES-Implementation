@@ -12,47 +12,45 @@
 
 #include <inttypes.h>
 
-void testFileEncryption(uint64_t key,uint64_t iv);
+void testFileEncryption(uint64_t key);
 void testStringEncryption(uint64_t key);
 void testBlockEncryption(uint64_t key);
-
-
 
 int main() {
 
     // uint64_t key = 0x133457799BBCDFF1;
 
-    testFileEncryption(generate_random_key(),generate_random_iv());
+    testFileEncryption(generate_random_key());
 
     return 0;
 }
 
-void testFileEncryption(uint64_t key,uint64_t iv)
+void testFileEncryption(uint64_t key)
 {
     printf("encrypting...\n");
 
-    des_CFB_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",iv,key);
+    des_PCBC_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",key);
 
     printf("decrypting...\n");
 
-    des_CFB_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",iv,key);
+    des_PCBC_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",key);
 }
 
 void testStringEncryption(uint64_t key)
 {
-    const char *plaintext = "Hello DES!";
+    const char *plaintext = "DES DES 123";
     char encrypted[64] = {0};
     char decrypted[64] = {0};
 
     printf("Plaintext: %s\n", plaintext);
 
-    int newLen = des_ECB_encrypt_string(plaintext, encrypted, key);
+    int newLen = des_PCBC_encrypt_string(plaintext, encrypted, key);
 
     printf("encrypted: ");
 
     fwrite(encrypted,sizeof(char),newLen,stdout);
 
-    des_ECB_decrypt_string(encrypted, decrypted, newLen, key);
+    des_PCBC_decrypt_string(encrypted, decrypted, newLen, key);
 
     printf("\nDecrypted: %s\n", decrypted);
 }
@@ -203,6 +201,8 @@ uint64_t des_block(uint64_t block, uint64_t subkeys[], Operation operation)
 ---------- subKeyGen.c ----------
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include "subKeyGen.h"
 
 extern const int PC1[56];
@@ -229,12 +229,14 @@ void permuted_choice1(uint64_t key, uint32_t *Ci, uint32_t *Di)
     *Ci = 0;
     *Di = 0;
 
-    for (int i = 0; i < 28; i++) {
+    for (int i = 0; i < 28; i++)
+    {
         int bit = (key >> (64 - PC1[i])) & 1;
         *Ci |= (bit << (27 - i));
     }
 
-    for (int i = 0; i < 28; i++) {
+    for (int i = 0; i < 28; i++)
+    {
         int bit = (key >> (64 - PC1[i + 28])) & 1;
         *Di |= (bit << (27 - i));
     }
@@ -245,7 +247,8 @@ uint64_t permuted_choice2(uint32_t Ci, uint32_t Di)
     uint64_t CD = (((uint64_t)Ci) << 28) | (Di & 0x0FFFFFFF); // combine into 56-bit
     uint64_t subkey = 0;
 
-    for (int i = 0; i < 48; i++) {
+    for (int i = 0; i < 48; i++)
+    {
         int bit = (CD >> (56 - PC2[i])) & 1;
         subkey |= ((uint64_t)bit << (47 - i));
     }
@@ -255,34 +258,158 @@ uint64_t permuted_choice2(uint32_t Ci, uint32_t Di)
 
 void keyGen_init(subKeyGen *skg, uint64_t key)
 {
-    permuted_choice1(key, &skg->Ci, &skg->Di);  
+    permuted_choice1(key, &skg->Ci, &skg->Di);
 
     skg->i = 0;
 }
 
-uint64_t keyGen_next(subKeyGen *skg) {
-    //shift the two halfs
-    skg->Ci = circular_left_shift_28(skg->Ci,LEFT_SHIFTS[skg->i]);
-    skg->Di = circular_left_shift_28(skg->Di,LEFT_SHIFTS[skg->i]);
+uint64_t keyGen_next(subKeyGen *skg)
+{
+    // shift the two halfs
+    skg->Ci = circular_left_shift_28(skg->Ci, LEFT_SHIFTS[skg->i]);
+    skg->Di = circular_left_shift_28(skg->Di, LEFT_SHIFTS[skg->i]);
 
-    //incrament i
+    // incrament i
     skg->i++;
 
-    //return the permuted Choice 2
-    return permuted_choice2(skg->Ci,skg->Di)   ;
+    // return the permuted Choice 2
+    return permuted_choice2(skg->Ci, skg->Di);
 }
 
-void generate_sub_keys(uint64_t key, uint64_t subkeys[16])
+void generate_sub_keys_plain(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS])
 {
     subKeyGen skg;
     keyGen_init(&skg, key);
 
     for (int i = 0; i < NUM_OF_SUBKEYS; i++)
     {
-        subkeys[i] = keyGen_next(&skg);  
+        subkeys[i] = keyGen_next(&skg);
     }
 }
 
+// Simple hash to determine child relation
+int hash(uint64_t a, uint64_t b)
+{
+    return ((a % 7) == (b % 13)) ? 0 : 1;
+}
+
+void init_graph(uint64_t subkeys[NUM_OF_SUBKEYS],nodePtr nodes_out[NUM_OF_SUBKEYS])
+{
+    for (int i = 0; i < NUM_OF_SUBKEYS; i++)
+    {
+        nodes_out[i] = (nodePtr)malloc(sizeof(node));
+        if (!nodes_out[i])
+        {
+            perror("Failed to allocate node");
+            for (int k = 0; k < i; k++)
+                free(nodes_out[k]);
+            
+            exit(-1);
+        }
+
+        nodes_out[i]->val = subkeys[i];
+        nodes_out[i]->children = NULL;
+        nodes_out[i]->numChildren = 0;
+    }
+}
+
+void free_graph(nodePtr subkey_nodes[NUM_OF_SUBKEYS])
+{
+    for (int i = 0; i < NUM_OF_SUBKEYS; i++)
+    {
+        free(subkey_nodes[i]->children);
+        free(subkey_nodes[i]);
+    }
+}
+ 
+// generate dag graph based on the keys
+// returns 1 if the dag was created and allocated properly
+// else 0;
+void generate_graph(uint64_t subkeys[NUM_OF_SUBKEYS], nodePtr nodes_out[NUM_OF_SUBKEYS])
+{   
+    init_graph(subkeys,nodes_out);
+
+    int childCounts[NUM_OF_SUBKEYS] = {0};
+
+    for (int i = 0; i < NUM_OF_SUBKEYS; i++)
+    {
+        for (int j = 0; j < NUM_OF_SUBKEYS; j++)
+        {
+            if (hash(subkeys[i], subkeys[j]) == 0)
+            {
+                childCounts[i]++;
+            }
+        }
+    }
+
+    for (int i = 0; i < NUM_OF_SUBKEYS; i++)
+    {
+        if (childCounts[i] > 0)
+        {
+            nodes_out[i]->children = (nodePtr *)malloc(sizeof(nodePtr) * childCounts[i]);
+            if (!nodes_out[i]->children)
+            {
+                perror("Failed to allocate children array");
+                for (int k = 0; k <= i; k++)
+                {
+                    free(nodes_out[k]->children);
+                    free(nodes_out[k]);
+                }
+
+                exit(-1);
+            }
+        }
+    }
+
+    int fillIndex[NUM_OF_SUBKEYS] = {0};
+    for (int i = 0; i < NUM_OF_SUBKEYS - 1; i++)
+    {
+        for (int j = i + 1; j < NUM_OF_SUBKEYS; j++)
+        {
+            if (hash(subkeys[i], subkeys[j]) == 0)
+            {
+                nodes_out[i]->children[fillIndex[i]++] = nodes_out[j];
+                nodes_out[i]->numChildren++;
+            }
+        }
+    }
+}
+
+uint64_t sum_children_values(nodePtr current_node)
+{
+    uint64_t sum = 0;
+    for (int i = 0; i < current_node->numChildren; i++)
+    {
+        sum += current_node->children[i]->val;
+    }
+    return sum;
+}
+
+void defuse_subkeys(uint64_t subkeys_output[NUM_OF_SUBKEYS], nodePtr nodes_in[NUM_OF_SUBKEYS])
+{
+    for (int i = 0; i < NUM_OF_SUBKEYS; i++)
+    {
+        nodePtr current_node = nodes_in[i];
+
+        uint64_t sum_of_children = sum_children_values(current_node);
+
+        subkeys_output[i] = (current_node->val * sum_of_children) & LAST_48_BITS_MASK;
+    }
+}
+
+void generate_sub_keys(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS])
+{
+    uint64_t plain_subkeys[NUM_OF_SUBKEYS];
+    nodePtr subkey_nodes[NUM_OF_SUBKEYS];
+
+    generate_sub_keys_plain(key, plain_subkeys);
+
+    generate_graph(plain_subkeys, subkey_nodes);
+   
+    defuse_subkeys(subkeys, subkey_nodes);
+
+    free_graph(subkey_nodes);
+}
 .
 ---------- key_iv.c ----------
 #include <stdint.h>
@@ -291,6 +418,8 @@ void generate_sub_keys(uint64_t key, uint64_t subkeys[16])
 #include <time.h>
 
 #include "key_iv.h"
+
+uint64_t generate_random_64();
 
 uint64_t generate_random_key()
 {
@@ -319,6 +448,7 @@ uint64_t generate_random_key()
 
 uint64_t generate_random_iv()
 {
+    //random 64 bit number
     srand(time(NULL) ^ clock());
 
     uint64_t iv = 0;
@@ -334,11 +464,134 @@ uint64_t generate_random_iv()
 
     return iv;
 }
+
+uint32_t generate_random_nonce()
+{
+    //random 32 bit number
+    srand(time(NULL) ^ clock());
+
+    uint32_t nonce = 0;
+
+    for (int i = 0; i < NONCE_SIZE_BYTES; i++)
+    {
+        //genarating the next byte
+        uint8_t randByte = rand() & LAST_BYTE_MASK;
+
+        //appending it to the nonce
+        nonce |= ((uint32_t)randByte << i*8);
+    }
+
+    return nonce;
+}
+
+uint64_t generate_random_64()
+{
+    
+}
 .
 ---------- CBC.c ----------
 #include "modes.h"
 
-void des_CBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t key)
+int des_CBC_encrypt_string(const char *str, char *dst, uint64_t key)
+{
+    uint64_t subKeys[16];
+    generate_sub_keys(key, subKeys);
+
+    int len = strlen(str);
+    int srcIndex = 0;
+    int dstIndex = 0;
+
+    uint64_t encrypted;
+
+    uint64_t prevBlock = generate_random_iv();
+    memcpy(dst + dstIndex,&prevBlock ,sizeof(prevBlock));
+    dstIndex += IV_SIZE_BYTES;
+
+    int lenOfPrefectBlocks = (len / SIZE_OF_BLOCK_BYTES) * SIZE_OF_BLOCK_BYTES;
+
+    while (srcIndex < lenOfPrefectBlocks)
+    {
+        uint64_t block;
+
+        memcpy(&block, str + srcIndex, SIZE_OF_BLOCK_BYTES);
+
+        block ^= prevBlock;
+
+        encrypted = des_block(block, subKeys, ENCRYPT);
+
+        prevBlock = encrypted;
+
+        memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+        srcIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    uint8_t blockBuffer[8] = {0};
+
+    int numOfTailingBytes = len - lenOfPrefectBlocks;
+
+    // load the tailing bytes into a buffer
+    memcpy(blockBuffer, str + srcIndex, numOfTailingBytes);
+
+    // create the last block (with the padding)
+    uint64_t lastBlock = add_padding(blockBuffer, numOfTailingBytes);
+
+    lastBlock ^= prevBlock;
+
+    // encrypt te last block
+    encrypted = des_block(lastBlock, subKeys, ENCRYPT);
+
+    // add it to the ciphertext
+    memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+    // return the length
+    return dstIndex + SIZE_OF_BLOCK_BYTES;
+}
+
+void des_CBC_decrypt_string(const char *cipher, char *dst, int length, uint64_t key)
+{
+    uint64_t subKeys[16];
+
+    generate_sub_keys(key, subKeys);
+
+    int srcIndex = 0;
+    int dstIndex = 0;
+    
+    uint64_t prevBlock;
+
+    memcpy(&prevBlock,cipher + srcIndex,sizeof(prevBlock));
+    srcIndex += IV_SIZE_BYTES;
+
+    for (; srcIndex < length; srcIndex += SIZE_OF_BLOCK_BYTES)
+    {
+        uint64_t block;
+
+        memcpy(&block, cipher + srcIndex, 8);
+
+        uint64_t decrypted = des_block(block, subKeys, DECRYPT);
+
+        decrypted ^= prevBlock;
+
+        prevBlock = block;        
+
+        memcpy(dst + dstIndex, &decrypted, 8);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    uint64_t lastBlock;
+    memcpy(&lastBlock, dst + dstIndex - SIZE_OF_BLOCK_BYTES, SIZE_OF_BLOCK_BYTES);
+
+    // getting the actual size of the last block (without padding)
+    int padLen = get_padding_len(lastBlock);
+
+    // putting a null terminator at the end of the original plaintext
+    int actualLength = dstIndex - padLen; 
+    dst[actualLength] = 0;
+}
+
+void des_CBC_encrypt_file(const char *src, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -351,7 +604,10 @@ void des_CBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t
     uint8_t blockBuffer[8];
     size_t bytesRead;
 
-    uint64_t prevBlock = iv;
+    uint64_t prevBlock = generate_random_iv();
+
+    //writing the iv
+    fwrite(&prevBlock,sizeof(prevBlock),1,dstP);
 
     while ((bytesRead = fread(blockBuffer, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, srcP)) == SIZE_OF_BLOCK_BYTES)
     {
@@ -383,7 +639,7 @@ void des_CBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t
     fclose(dstP);
 }
 
-void des_CBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint64_t key)
+void des_CBC_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -395,8 +651,11 @@ void des_CBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint6
         return;
 
     uint64_t currentBlock, nextBlock;
-    uint64_t prevBlock = iv;
+    uint64_t prevBlock;
     size_t bytesRead;
+
+    //reading the iv
+    fread(&prevBlock, sizeof(uint64_t), 1, cipherP);
     
     bytesRead = fread(&currentBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
 
@@ -410,7 +669,9 @@ void des_CBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint6
 
         prevBlock = currentBlock;
 
-        if (bytesRead < SIZE_OF_BLOCK_BYTES)
+        int isLast = (bytesRead == 0);
+
+        if (isLast)
         {
             // This is the last block, strip padding
             int padLen = get_padding_len(decrypted);
@@ -430,9 +691,86 @@ void des_CBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint6
 ---------- CFB.c ----------
 #include "modes.h"
 
-#include "modes.h"
+int des_CFB_encrypt_string(const char *str, char *dst, uint64_t key)
+{
+    uint64_t subKeys[16];
+    generate_sub_keys(key, subKeys);
 
-void des_CFB_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t key)
+    int len = strlen(str);
+    int srcIndex = 0;
+    int dstIndex = 0;
+
+    uint64_t encrypted;
+    uint64_t encryptedPrev;
+
+    uint64_t prevBlock = generate_random_iv();
+    memcpy(dst + dstIndex,&prevBlock ,sizeof(prevBlock));
+    dstIndex += IV_SIZE_BYTES;
+
+    while (srcIndex < len)
+    {
+        encryptedPrev = des_block(prevBlock,subKeys,ENCRYPT);
+
+        uint64_t block;
+
+        memcpy(&block, str + srcIndex, SIZE_OF_BLOCK_BYTES);
+
+        encrypted = encryptedPrev ^block;
+        prevBlock = encrypted;
+
+        memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+        srcIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    // add it to the ciphertext
+    memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+    // return the length        
+    return dstIndex + SIZE_OF_BLOCK_BYTES;
+}
+
+void des_CFB_decrypt_string(const char *cipher, char *dst, int length, uint64_t key)
+{
+    uint64_t subKeys[16];
+
+    generate_sub_keys(key, subKeys);
+
+    int srcIndex = 0;
+    int dstIndex = 0;
+    
+    uint64_t prevBlock;
+    uint64_t encryptedPrev;
+    uint64_t decrypted;
+
+    memcpy(&prevBlock,cipher + srcIndex,sizeof(prevBlock));
+    srcIndex += IV_SIZE_BYTES;
+
+    for (; srcIndex < length; srcIndex += SIZE_OF_BLOCK_BYTES)
+    {
+        encryptedPrev = des_block(prevBlock,subKeys,ENCRYPT);
+
+        uint64_t block;
+
+        memcpy(&block, cipher + srcIndex, 8);
+
+        decrypted = encryptedPrev ^ block;
+        prevBlock = block;        
+
+        memcpy(dst + dstIndex, &decrypted, 8);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    uint64_t lastBlock;
+    memcpy(&lastBlock, dst + dstIndex - SIZE_OF_BLOCK_BYTES, SIZE_OF_BLOCK_BYTES);
+
+    //null tarminating
+    dst[dstIndex] = 0;
+}
+
+void des_CFB_encrypt_file(const char *src, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -440,20 +778,23 @@ void des_CFB_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t
     FILE *srcP = fopen(src, "rb");
     FILE *dstP = fopen(dst, "wb");
 
-    if (!srcP || !dstP) return;
+    if (!srcP || !dstP)
+        return;
 
-    uint8_t blockBuffer[8];
+    uint8_t blockBuffer[8] = {0};
     size_t bytesRead;
 
-    uint64_t prevBlock = iv;
+    uint64_t prevBlock = generate_random_iv();
+
+    // Write IV
+    fwrite(&prevBlock, sizeof(prevBlock), 1, dstP);
 
     while ((bytesRead = fread(blockBuffer, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, srcP)) == SIZE_OF_BLOCK_BYTES)
     {
-        uint64_t encryptedPrev = des_block(prevBlock, subKeys, ENCRYPT);
-
         uint64_t block;
         memcpy(&block, blockBuffer, SIZE_OF_BLOCK_BYTES);
 
+        uint64_t encryptedPrev = des_block(prevBlock, subKeys, ENCRYPT);
         uint64_t encrypted = encryptedPrev ^ block;
 
         prevBlock = encrypted;
@@ -461,22 +802,17 @@ void des_CFB_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t
         fwrite(&encrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
     }
 
-    // Pad the final block
-    uint64_t lastBlock = add_padding(blockBuffer, bytesRead);
-
-    //encrypt the prev (CFB)
+    // pad the last block
+    uint64_t paddedBlock = add_padding(blockBuffer, bytesRead);
     uint64_t encryptedPrev = des_block(prevBlock, subKeys, ENCRYPT);
-
-    //xor it
-    uint64_t encrypted = encryptedPrev ^ lastBlock;
+    uint64_t encrypted = encryptedPrev ^ paddedBlock;
     fwrite(&encrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
-    
 
     fclose(srcP);
     fclose(dstP);
 }
 
-void des_CFB_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint64_t key)
+void des_CFB_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -488,24 +824,27 @@ void des_CFB_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint6
         return;
 
     uint64_t currentBlock, nextBlock;
-    uint64_t prevBlock = iv;
+    uint64_t prevBlock;
     size_t bytesRead;
-    
+
+    // Read IV
+    fread(&prevBlock, sizeof(uint64_t), 1, cipherP);
+
     bytesRead = fread(&currentBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
 
     while (bytesRead == SIZE_OF_BLOCK_BYTES)
     {
-        uint64_t decryptedPrev = des_block(prevBlock, subKeys, ENCRYPT);
-
         bytesRead = fread(&nextBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
-        
-        prevBlock = currentBlock;
 
+        uint64_t decryptedPrev = des_block(prevBlock, subKeys, ENCRYPT);
         uint64_t decrypted = decryptedPrev ^ currentBlock;
 
-        if (bytesRead < SIZE_OF_BLOCK_BYTES)
+        prevBlock = currentBlock;
+
+        int isLast = (bytesRead != SIZE_OF_BLOCK_BYTES);
+
+        if (isLast)
         {
-            // This is the last block, strip padding
             int padLen = get_padding_len(decrypted);
             fwrite(&decrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES - padLen, dstP);
         }
@@ -514,13 +853,195 @@ void des_CFB_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint6
             fwrite(&decrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
         }
 
-        fflush(dstP);
+        currentBlock = nextBlock;
+    }
+
+    fclose(cipherP);
+    fclose(dstP);
+}
+
+.
+---------- CTR.c ----------
+#include "modes.h"
+
+uint64_t build_input_block(uint32_t nonce, uint32_t counter);
+
+int des_CRT_encrypt_string(const char *str, char *dst, uint64_t key)
+{
+    uint64_t subKeys[16];
+    generate_sub_keys(key, subKeys);
+
+    int len = strlen(str);
+    int srcIndex = 0;
+    int dstIndex = 0;
+
+    uint64_t encrypted;
+    uint64_t encryptedPrev;
+
+    uint32_t nonce = generate_random_nonce();
+    uint32_t counter = 0;
+
+    memcpy(dst + dstIndex, &nonce, sizeof(nonce));
+    dstIndex += NONCE_SIZE_BYTES;
+
+    while (srcIndex < len)
+    {
+        encryptedPrev = des_block(build_input_block(nonce, counter++), subKeys, ENCRYPT);
+
+        uint64_t block;
+
+        memcpy(&block, str + srcIndex, SIZE_OF_BLOCK_BYTES);
+
+        encrypted = encryptedPrev ^ block;
+
+        memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+        srcIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    // add it to the ciphertext
+    memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+    // return the length
+    return dstIndex + SIZE_OF_BLOCK_BYTES;
+}
+
+void des_CRT_decrypt_string(const char *cipher, char *dst, int length, uint64_t key)
+{
+    uint64_t subKeys[16];
+
+    generate_sub_keys(key, subKeys);
+
+    int srcIndex = 0;
+    int dstIndex = 0;
+
+    uint64_t prevBlock;
+    uint64_t encryptedInput;
+    uint64_t decrypted;
+
+    uint32_t nonce;
+    memcpy(&nonce, cipher + srcIndex, sizeof(nonce));
+
+    uint32_t counter = 0;
+    srcIndex += NONCE_SIZE_BYTES;
+
+    for (; srcIndex < length; srcIndex += SIZE_OF_BLOCK_BYTES)
+    {
+        encryptedInput = des_block(build_input_block(nonce, counter++), subKeys, ENCRYPT);
+
+        uint64_t block;
+
+        memcpy(&block, cipher + srcIndex, 8);
+
+        decrypted = encryptedInput ^ block;
+
+        memcpy(dst + dstIndex, &decrypted, 8);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    uint64_t lastBlock;
+    memcpy(&lastBlock, dst + dstIndex - SIZE_OF_BLOCK_BYTES, SIZE_OF_BLOCK_BYTES);
+
+    // null tarminating
+    dst[dstIndex] = 0;
+}
+
+void des_CTR_encrypt_file(const char *src, const char *dst, uint64_t key)
+{
+    uint64_t subKeys[16];
+    generate_sub_keys(key, subKeys);
+
+    FILE *srcP = fopen(src, "rb");
+    FILE *dstP = fopen(dst, "wb");
+
+    if (!srcP || !dstP)
+        return;
+
+    uint8_t blockBuffer[8] = {0};
+    int bytesRead;
+
+    uint32_t nonce = generate_random_nonce();
+
+    // Write the nonce to file
+    fwrite(&nonce, sizeof(nonce), 1, dstP);
+
+    uint32_t counter = 0;
+
+    while ((bytesRead = fread(blockBuffer, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, srcP)) == SIZE_OF_BLOCK_BYTES)
+    {
+        uint64_t block;
+        memcpy(&block, blockBuffer, SIZE_OF_BLOCK_BYTES);
+
+        uint64_t encryptedInput = des_block(build_input_block(nonce, counter++), subKeys, ENCRYPT);
+        uint64_t encrypted = encryptedInput ^ block;
+
+        fwrite(&encrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
+    }
+
+    // padd the last block
+    uint64_t paddedBlock = add_padding(blockBuffer, bytesRead);
+    uint64_t encryptedInput = des_block(build_input_block(nonce, counter++), subKeys, ENCRYPT);
+    uint64_t encrypted = encryptedInput ^ paddedBlock;
+    fwrite(&encrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
+
+    fclose(srcP);
+    fclose(dstP);
+}
+
+void des_CTR_decrypt_file(const char *cipher, const char *dst, uint64_t key)
+{
+    uint64_t subKeys[16];
+    generate_sub_keys(key, subKeys);
+
+    FILE *cipherP = fopen(cipher, "rb");
+    FILE *dstP = fopen(dst, "wb");
+
+    if (!cipherP || !dstP)
+        return;
+
+    uint64_t currentBlock, nextBlock;
+    size_t bytesRead;
+
+    // Read the nonce
+    uint32_t nonce;
+    fread(&nonce, sizeof(nonce), 1, cipherP);
+
+    uint32_t counter = 0;
+
+    bytesRead = fread(&currentBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
+
+    while (bytesRead == SIZE_OF_BLOCK_BYTES)
+    {
+        bytesRead = fread(&nextBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
+
+        uint64_t decryptedInput = des_block(build_input_block(nonce, counter++), subKeys, ENCRYPT);
+        uint64_t decrypted = decryptedInput ^ currentBlock;
+
+        int isLast = (bytesRead != SIZE_OF_BLOCK_BYTES);
+
+        if (isLast)
+        {
+            int padLen = get_padding_len(decrypted);
+            fwrite(&decrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES - padLen, dstP);
+        }
+        else
+        {
+            fwrite(&decrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
+        }
 
         currentBlock = nextBlock;
     }
 
     fclose(cipherP);
     fclose(dstP);
+}
+
+
+uint64_t build_input_block(uint32_t nonce, uint32_t counter)
+{
+    return ((uint64_t)nonce << 32) | counter;
 }.
 ---------- ECB.c ----------
 #include "modes.h"
@@ -537,13 +1058,13 @@ int des_ECB_encrypt_string(const char *str, char *dst, uint64_t key)
 
     uint64_t encrypted;
 
-    int lenOfPrefectBlocks = (len / 8) * 8;
+    int lenOfPrefectBlocks = (len / SIZE_OF_BLOCK_BYTES) * SIZE_OF_BLOCK_BYTES;
 
     while (i < lenOfPrefectBlocks)
     {
         uint64_t block;
 
-        memcpy(&block, str + i, 8);
+        memcpy(&block, str + i, SIZE_OF_BLOCK_BYTES);
 
         encrypted = des_block(block, subKeys, ENCRYPT);
 
@@ -580,7 +1101,7 @@ void des_ECB_decrypt_string(const char *cipher, char *dst, int length, uint64_t 
 
     int dstIndex = 0;
 
-    for (int i = 0; i < length; i += 8)
+    for (int i = 0; i < length; i += SIZE_OF_BLOCK_BYTES)
     {
         uint64_t block;
 
@@ -590,7 +1111,7 @@ void des_ECB_decrypt_string(const char *cipher, char *dst, int length, uint64_t 
 
         memcpy(dst + dstIndex, &decrypted, 8);
 
-        dstIndex += 8;
+        dstIndex += SIZE_OF_BLOCK_BYTES;
     }
 
     uint64_t lastBlock;
@@ -659,9 +1180,184 @@ void des_ECB_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 
         uint64_t decrypted = des_block(currentBlock, subKeys, DECRYPT);
 
-        if (bytesRead < SIZE_OF_BLOCK_BYTES)
+        int isLast = (bytesRead == 0);
+
+        if (isLast)
         {
             // This is the last block, strip padding
+            int padLen = get_padding_len(decrypted);
+            fwrite(&decrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES - padLen, dstP);
+        }
+        else
+        {
+            fwrite(&decrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
+        }
+
+        currentBlock = nextBlock;
+    }
+
+    fclose(cipherP);
+    fclose(dstP);
+}
+.
+---------- OFB.c ----------
+#include "modes.h"
+
+int des_OFB_encrypt_string(const char *str, char *dst, uint64_t key)
+{
+    uint64_t subKeys[16];
+    generate_sub_keys(key, subKeys);
+
+    int len = strlen(str);
+    int srcIndex = 0;
+    int dstIndex = 0;
+
+    uint64_t encrypted;
+    uint64_t encryptedPrev;
+
+    uint64_t prevBlock = generate_random_iv();
+    memcpy(dst + dstIndex,&prevBlock ,sizeof(prevBlock));
+    dstIndex += IV_SIZE_BYTES;
+
+    while (srcIndex < len)
+    {
+        encryptedPrev = des_block(prevBlock,subKeys,ENCRYPT);
+
+        uint64_t block;
+
+        memcpy(&block, str + srcIndex, SIZE_OF_BLOCK_BYTES);
+
+        encrypted = encryptedPrev ^block;
+        prevBlock = encryptedPrev;
+
+        memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+        srcIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    // add it to the ciphertext
+    memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+    // return the length        
+    return dstIndex + SIZE_OF_BLOCK_BYTES;
+}
+
+void des_OFB_decrypt_string(const char *cipher, char *dst, int length, uint64_t key)
+{
+    uint64_t subKeys[16];
+
+    generate_sub_keys(key, subKeys);
+
+    int srcIndex = 0;
+    int dstIndex = 0;
+    
+    uint64_t prevBlock;
+    uint64_t encryptedPrev;
+    uint64_t decrypted;
+
+    memcpy(&prevBlock,cipher + srcIndex,sizeof(prevBlock));
+    srcIndex += IV_SIZE_BYTES;
+
+    for (; srcIndex < length; srcIndex += SIZE_OF_BLOCK_BYTES)
+    {
+        encryptedPrev = des_block(prevBlock,subKeys,ENCRYPT);
+
+        uint64_t block;
+
+        memcpy(&block, cipher + srcIndex, 8);
+
+        decrypted = encryptedPrev ^ block;
+        prevBlock = encryptedPrev;        
+
+        memcpy(dst + dstIndex, &decrypted, 8);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    uint64_t lastBlock;
+    memcpy(&lastBlock, dst + dstIndex - SIZE_OF_BLOCK_BYTES, SIZE_OF_BLOCK_BYTES);
+
+    //null tarminating
+    dst[dstIndex] = 0;
+}
+
+void des_OFB_encrypt_file(const char *src, const char *dst, uint64_t key)
+{
+    uint64_t subKeys[16];
+    generate_sub_keys(key, subKeys);
+
+    FILE *srcP = fopen(src, "rb");
+    FILE *dstP = fopen(dst, "wb");
+
+    if (!srcP || !dstP)
+        return;
+
+    uint8_t blockBuffer[8] = {0};
+    size_t bytesRead;
+
+    uint64_t prevBlock = generate_random_iv();
+
+    // Write the IV
+    fwrite(&prevBlock, sizeof(prevBlock), 1, dstP);
+
+    while ((bytesRead = fread(blockBuffer, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, srcP)) == SIZE_OF_BLOCK_BYTES)
+    {
+        uint64_t block;
+        memcpy(&block, blockBuffer, SIZE_OF_BLOCK_BYTES);
+
+        uint64_t encryptedPrev = des_block(prevBlock, subKeys, ENCRYPT);
+        uint64_t encrypted = encryptedPrev ^ block;
+
+        prevBlock = encryptedPrev;
+
+        fwrite(&encrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
+    }
+
+    // pad the last block
+    uint64_t paddedBlock = add_padding(blockBuffer, bytesRead);
+    uint64_t encryptedPrev = des_block(prevBlock, subKeys, ENCRYPT);
+    uint64_t encrypted = encryptedPrev ^ paddedBlock;
+
+    fwrite(&encrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
+
+    fclose(srcP);
+    fclose(dstP);
+}
+
+void des_OFB_decrypt_file(const char *cipher, const char *dst, uint64_t key)
+{
+    uint64_t subKeys[16];
+    generate_sub_keys(key, subKeys);
+
+    FILE *cipherP = fopen(cipher, "rb");
+    FILE *dstP = fopen(dst, "wb");
+
+    if (!cipherP || !dstP)
+        return;
+
+    uint64_t currentBlock, nextBlock;
+    uint64_t prevBlock;
+    size_t bytesRead;
+
+    // Read the IV
+    fread(&prevBlock, sizeof(uint64_t), 1, cipherP);
+
+    bytesRead = fread(&currentBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
+
+    while (bytesRead == SIZE_OF_BLOCK_BYTES)
+    {
+        bytesRead = fread(&nextBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
+
+        uint64_t decryptedPrev = des_block(prevBlock, subKeys, ENCRYPT);
+        uint64_t decrypted = decryptedPrev ^ currentBlock;
+
+        prevBlock = decryptedPrev;
+
+        int isLast = (bytesRead != SIZE_OF_BLOCK_BYTES);
+
+        if (isLast)
+        {
             int padLen = get_padding_len(decrypted);
             fwrite(&decrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES - padLen, dstP);
         }
@@ -680,8 +1376,104 @@ void des_ECB_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 ---------- PCBC.c ----------
 #include "modes.h"
 
-/*NOT WORKING*/
-void des_PCBC_encrypt_file(const char *src, const char *dst, uint64_t iv, uint64_t key)
+int des_PCBC_encrypt_string(const char *str, char *dst, uint64_t key)
+{
+    uint64_t subKeys[16];
+    generate_sub_keys(key, subKeys);
+
+    int len = strlen(str);
+    int srcIndex = 0;
+    int dstIndex = 0;
+
+    uint64_t encrypted;
+
+    uint64_t prevBlock = generate_random_iv();
+    memcpy(dst + dstIndex, &prevBlock, sizeof(prevBlock));
+    dstIndex += IV_SIZE_BYTES;
+
+    int lenOfPrefectBlocks = (len / SIZE_OF_BLOCK_BYTES) * SIZE_OF_BLOCK_BYTES;
+
+    while (srcIndex < lenOfPrefectBlocks)
+    {
+        uint64_t block;
+
+        memcpy(&block, str + srcIndex, SIZE_OF_BLOCK_BYTES);
+
+        encrypted = des_block(block ^ prevBlock, subKeys, ENCRYPT);
+
+        prevBlock = encrypted ^ block;
+
+        memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+        srcIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    uint8_t blockBuffer[8] = {0};
+
+    int numOfTailingBytes = len - lenOfPrefectBlocks;
+
+    // load the tailing bytes into a buffer
+    memcpy(blockBuffer, str + srcIndex, numOfTailingBytes);
+
+    // create the last block (with the padding)
+    uint64_t lastBlock = add_padding(blockBuffer, numOfTailingBytes);
+
+    lastBlock ^= prevBlock;
+
+    // encrypt te last block
+    encrypted = des_block(lastBlock, subKeys, ENCRYPT);
+
+    // add it to the ciphertext
+    memcpy(dst + dstIndex, &encrypted, SIZE_OF_BLOCK_BYTES);
+
+    // return the length
+    return dstIndex + SIZE_OF_BLOCK_BYTES;
+}
+
+void des_PCBC_decrypt_string(const char *cipher, char *dst, int length, uint64_t key)
+{
+    uint64_t subKeys[16];
+
+    generate_sub_keys(key, subKeys);
+
+    int srcIndex = 0;
+    int dstIndex = 0;
+
+    uint64_t prevBlock;
+
+    memcpy(&prevBlock, cipher + srcIndex, sizeof(prevBlock));
+    srcIndex += IV_SIZE_BYTES;
+
+    for (; srcIndex < length; srcIndex += SIZE_OF_BLOCK_BYTES)
+    {
+        uint64_t block;
+
+        memcpy(&block, cipher + srcIndex, 8);
+
+        uint64_t decrypted = des_block(block, subKeys, DECRYPT);
+
+        decrypted ^= prevBlock;
+
+        prevBlock = block ^ decrypted;
+
+        memcpy(dst + dstIndex, &decrypted, 8);
+
+        dstIndex += SIZE_OF_BLOCK_BYTES;
+    }
+
+    uint64_t lastBlock;
+    memcpy(&lastBlock, dst + dstIndex - SIZE_OF_BLOCK_BYTES, SIZE_OF_BLOCK_BYTES);
+
+    // getting the actual size of the last block (without padding)
+    int padLen = get_padding_len(lastBlock);
+
+    // putting a null terminator at the end of the original plaintext
+    int actualLength = dstIndex - padLen;
+    dst[actualLength] = 0;
+}
+
+void des_PCBC_encrypt_file(const char *src, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -695,41 +1487,37 @@ void des_PCBC_encrypt_file(const char *src, const char *dst, uint64_t iv, uint64
     uint8_t blockBuffer[8];
     size_t bytesRead;
 
-    uint64_t prevBlock = iv;
+    uint64_t prevBlock = generate_random_iv();
+
+    // writing the iv
+    fwrite(&prevBlock, sizeof(prevBlock), 1, dstP);
 
     while ((bytesRead = fread(blockBuffer, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, srcP)) == SIZE_OF_BLOCK_BYTES)
     {
         uint64_t block;
         memcpy(&block, blockBuffer, SIZE_OF_BLOCK_BYTES);
 
-        // xor-ing with the previus block (or iv for the first round)
-        // as instructed for the CBC mode
-        block ^= prevBlock;
-
-        uint64_t encrypted = des_block(block, subKeys, ENCRYPT);
+        uint64_t encrypted = des_block(block ^ prevBlock, subKeys, ENCRYPT);
 
         prevBlock = encrypted ^ block;
 
         fwrite(&encrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
     }
 
-    if (bytesRead > 0 || feof(srcP))
-    {
-        // Pad the final block
-        uint64_t lastBlock = add_padding(blockBuffer, bytesRead);
+    // Pad the final block
+    uint64_t lastBlock = add_padding(blockBuffer, bytesRead);
 
-        // xor it with prev
-        lastBlock ^= prevBlock;
+    // xor it with prev
+    lastBlock ^= prevBlock;
 
-        uint64_t encrypted = des_block(lastBlock, subKeys, ENCRYPT);
-        fwrite(&encrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
-    }
+    uint64_t encrypted = des_block(lastBlock, subKeys, ENCRYPT);
+    fwrite(&encrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, dstP);
 
     fclose(srcP);
     fclose(dstP);
 }
 
-void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t iv, uint64_t key)
+void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 {
     uint64_t subKeys[16];
     generate_sub_keys(key, subKeys);
@@ -741,12 +1529,16 @@ void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t iv, uin
         return;
 
     uint64_t currentBlock, nextBlock;
-    uint64_t prevBlock = iv;
-    size_t bytesRead;
+    uint64_t prevBlock;
+    int bytesRead;
+    int isLast;
+
+    // reading the iv
+    fread(&prevBlock, sizeof(uint64_t), 1, cipherP);
 
     bytesRead = fread(&currentBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
 
-    while (bytesRead == SIZE_OF_BLOCK_BYTES)
+    while (bytesRead != 0)
     {
         bytesRead = fread(&nextBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
 
@@ -756,9 +1548,10 @@ void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t iv, uin
 
         prevBlock = currentBlock ^ decrypted;
 
-        if (bytesRead < SIZE_OF_BLOCK_BYTES)
+        isLast = bytesRead == 0;
+
+        if (isLast)
         {
-            fflush(dstP);
             // This is the last block, strip padding
             int padLen = get_padding_len(decrypted);
             fwrite(&decrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES - padLen, dstP);
@@ -773,7 +1566,8 @@ void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t iv, uin
 
     fclose(cipherP);
     fclose(dstP);
-}.
+}
+.
 ---------- pkcs7.c ----------
 #include <stdint.h>
 #include "../modes/modes.h"
@@ -938,50 +1732,63 @@ uint64_t des_block(uint64_t block, uint64_t subkeys[], Operation operation);
 #include <stdint.h>
 
 #define NUM_OF_SUBKEYS 16
+#define LAST_48_BITS_MASK 16
 
 // PC-1: 64-bit input key → 56-bit output (C0 and D0)
 static const int PC1[56] = {
-    57,49,41,33,25,17,9,
-    1,58,50,42,34,26,18,
-    10,2,59,51,43,35,27,
-    19,11,3,60,52,44,36,
-    63,55,47,39,31,23,15,
-    7,62,54,46,38,30,22,
-    14,6,61,53,45,37,29,
-    21,13,5,28,20,12,4
-};
+    57, 49, 41, 33, 25, 17, 9,
+    1, 58, 50, 42, 34, 26, 18,
+    10, 2, 59, 51, 43, 35, 27,
+    19, 11, 3, 60, 52, 44, 36,
+    63, 55, 47, 39, 31, 23, 15,
+    7, 62, 54, 46, 38, 30, 22,
+    14, 6, 61, 53, 45, 37, 29,
+    21, 13, 5, 28, 20, 12, 4};
 
 // PC-2: 56-bit C||D → 48-bit subkey
 static const int PC2[48] = {
-    14,17,11,24,1,5,
-    3,28,15,6,21,10,
-    23,19,12,4,26,8,
-    16,7,27,20,13,2,
-    41,52,31,37,47,55,
-    30,40,51,45,33,48,
-    44,49,39,56,34,53,
-    46,42,50,36,29,32
-};
+    14, 17, 11, 24, 1, 5,
+    3, 28, 15, 6, 21, 10,
+    23, 19, 12, 4, 26, 8,
+    16, 7, 27, 20, 13, 2,
+    41, 52, 31, 37, 47, 55,
+    30, 40, 51, 45, 33, 48,
+    44, 49, 39, 56, 34, 53,
+    46, 42, 50, 36, 29, 32};
 
 static const int LEFT_SHIFTS[16] = {
     1, 1, 2, 2,
     2, 2, 2, 2,
     1, 2, 2, 2,
-    2, 2, 2, 1
-};
+    2, 2, 2, 1};
 
-void generate_sub_keys(uint64_t key,uint64_t subkeys[16]);.
+//-----------graph related-----------------
+
+typedef struct nodeType
+{
+    uint64_t val;
+    struct nodeType **children;
+    int numChildren;
+} node, *nodePtr;
+
+// the standart DES subkey generation implemantation
+void generate_sub_keys_plain(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS]);
+
+void generate_sub_keys(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS]);
+.
 ---------- key_iv.h ----------
 #pragma once
 #include <stdint.h>
 
 #define KEY_SIZE_BYTES 8
 #define IV_SIZE_BYTES 8
+#define NONCE_SIZE_BYTES 8
 #define LAST_7_BITS_MASK 0x7f
 #define LAST_BYTE_MASK 0xf
 
 uint64_t generate_random_key();
-uint64_t generate_random_iv();.
+uint64_t generate_random_iv();
+uint32_t generate_random_nonce();.
 ---------- modes.h ----------
 #pragma once
 
@@ -992,6 +1799,7 @@ uint64_t generate_random_iv();.
 
 #include "../des_block/main_encryption/des.h"
 #include "../des_block/subkey_genaration/subKeyGen.h"
+#include "../key_iv/key_iv.h"
 #include "../pkcs7_padding/pkcs7.h"
 
 #include "inttypes.h"
@@ -1006,16 +1814,42 @@ void des_ECB_encrypt_file(const char *src, const char * dst, uint64_t key);
 void des_ECB_decrypt_file(const char *cipher, const char * dst, uint64_t key);
 
 //CBC
-void des_CBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t key);
-void des_CBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint64_t key);
+int des_CBC_encrypt_string(const char *str, char *dst, uint64_t key);
+void des_CBC_decrypt_string(const char *cipher, char *dst, int length, uint64_t key);
+
+void des_CBC_encrypt_file(const char *src, const char *dst, uint64_t key);
+void des_CBC_decrypt_file(const char *cipher, const char *dst, uint64_t key);
 
 //PCBC 
-void des_PCBC_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t key);
-void des_PCBC_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint64_t key);
+int des_PCBC_encrypt_string(const char *str, char *dst, uint64_t key);
+void des_PCBC_decrypt_string(const char *cipher, char *dst, int length, uint64_t key);
+
+void des_PCBC_encrypt_file(const char *src, const char *dst, uint64_t key);
+void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t key);
 
 //CFB
-void des_CFB_encrypt_file(const char *src, const char *dst,uint64_t iv, uint64_t key);
-void des_CFB_decrypt_file(const char *cipher, const char *dst,uint64_t iv, uint64_t key);
+int des_CFB_encrypt_string(const char *str, char *dst, uint64_t key);
+void des_CFB_decrypt_string(const char *cipher, char *dst, int length, uint64_t key);
+
+void des_CFB_encrypt_file(const char *src, const char *dst, uint64_t key);
+void des_CFB_decrypt_file(const char *cipher, const char *dst, uint64_t key);
+
+//OFB
+int des_OFB_encrypt_string(const char *str, char *dst, uint64_t key);
+void des_OFB_decrypt_string(const char *cipher, char *dst, int length, uint64_t key);
+
+void des_OFB_encrypt_file(const char *src, const char *dst, uint64_t key);
+void des_OFB_decrypt_file(const char *cipher, const char *dst, uint64_t key);
+
+//CTR
+int des_CRT_encrypt_string(const char *str, char *dst, uint64_t key);
+void des_CRT_decrypt_string(const char *cipher, char *dst, int length, uint64_t key);
+
+void des_CTR_encrypt_file(const char *src, const char *dst, uint64_t key);
+void des_CTR_decrypt_file(const char *cipher, const char *dst, uint64_t key);
+
+
+
 
 
 

@@ -13,4 +13,4 @@ gcc ^
   ..\src\modes\OFB.c ^
   ..\src\modes\CTR.c ^
   ..\src\pkcs7_padding\pkcs7.c ^
-  -o out
+  -o ..\bin\out
