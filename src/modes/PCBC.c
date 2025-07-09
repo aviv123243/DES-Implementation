@@ -165,7 +165,7 @@ void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 
     bytesRead = fread(&currentBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
 
-    while (bytesRead == SIZE_OF_BLOCK_BYTES)
+    while (bytesRead != 0)
     {
         bytesRead = fread(&nextBlock, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, cipherP);
 
@@ -179,7 +179,6 @@ void des_PCBC_decrypt_file(const char *cipher, const char *dst, uint64_t key)
 
         if (isLast)
         {
-            fflush(dstP);
             // This is the last block, strip padding
             int padLen = get_padding_len(decrypted);
             fwrite(&decrypted, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES - padLen, dstP);

@@ -98,7 +98,7 @@ void des_OFB_encrypt_file(const char *src, const char *dst, uint64_t key)
     //writing the iv
     fwrite(&prevBlock,sizeof(prevBlock),1,dstP);
 
-    while ((bytesRead = fread(&block, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, srcP)) == SIZE_OF_BLOCK_BYTES)
+    while ((bytesRead = fread(&block, sizeof(uint8_t), SIZE_OF_BLOCK_BYTES, srcP)) != 0)
     {
         uint64_t encryptedPrev = des_block(prevBlock, subKeys, ENCRYPT);
 

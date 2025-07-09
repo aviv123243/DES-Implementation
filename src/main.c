@@ -26,11 +26,11 @@ void testFileEncryption(uint64_t key)
 {
     printf("encrypting...\n");
 
-    des_ECB_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",key);
+    des_CFB_encrypt_file("../test/plaintext.txt","../test/ciphertext.txt",key);
 
     printf("decrypting...\n");
 
-    des_ECB_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",key);
+    des_CFB_decrypt_file("../test/ciphertext.txt","../test/decoded.txt",key);
 }
 
 void testStringEncryption(uint64_t key)
