@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #define NUM_OF_SUBKEYS 16
-#define LAST_48_BITS_MASK 16
+#define LAST_48_BITS_MASK ((1ULL << 48) - 1)
 
 // PC-1: 64-bit input key → 56-bit output (C0 and D0)
 static const int PC1[56] = {
