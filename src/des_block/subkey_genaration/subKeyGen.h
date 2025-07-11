@@ -42,6 +42,6 @@ typedef struct nodeType
     int numChildren;
 } node, *nodePtr;
 
-// the standart DES subkey generation implemantation
+// standard DES subkey generation implementation
 void generate_sub_keys_plain(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS]);
 void generate_sub_keys(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS]);
