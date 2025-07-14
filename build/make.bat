@@ -1,4 +1,4 @@
-@echo off
+
 
 gcc ^
   ..\src\main.c ^

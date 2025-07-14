@@ -5,14 +5,13 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "../constants.h"
 #include "../des_block/main_encryption/des.h"
 #include "../des_block/subkey_genaration/subKeyGen.h"
 #include "../key_iv/key_iv.h"
 #include "../pkcs7_padding/pkcs7.h"
 
 #include "inttypes.h"
-
-#define SIZE_OF_BLOCK_BYTES 8
 
 // ECB
 int des_ECB_encrypt_string(const char *str, char *dst, uint64_t key);

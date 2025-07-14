@@ -28,12 +28,13 @@ uint32_t F(uint32_t right,uint64_t subKey)
 
 uint64_t expand(uint32_t right)
 {
+    int expandedSize = 48;
     uint64_t result = 0;
 
-    for (int i = 0; i < 48; i++) {
-        int bit_index = E[i] - 1; 
-        int bit = (right >> (31 - bit_index)) & 1; 
-        result |= ((uint64_t)bit << (47 - i)); 
+    for (int i = 0; i < expandedSize; i++) {
+        int bitIndex = E[i] - 1; 
+        int bit = (right >> (SIZE_OF_HALF_BLOCK_BITS - 1 - bitIndex)) & 1; 
+        result |= ((uint64_t)bit << (expandedSize - 1 - i)); 
     }
 
     return result;
@@ -48,9 +49,14 @@ uint32_t keyed_substitution(uint64_t right)
         // with the mask 0011 1111 (last 6 bits)
         uint8_t chunk = (right >> (42 - 6 * i)) & 0x3F;
 
-        // Compute row and column
-        int row = ((chunk & 0x20) >> 4) | (chunk & 0x01);  // bits 6 and 1
-        int col = (chunk >> 1) & 0x0F;                     // bits 2–5
+        // Compute row
+        // getting bit 6 and moving it to place 2 
+        //than connecting with 1
+        int row = ((chunk & 0x20) >> 4) | (chunk & 0x01);  
+
+        //compute col 
+        // bits 2–5
+        int col = (chunk >> 1) & 0x0F;                     
 
         // Lookup S-box output (4 bits)
         uint8_t s_out = S[i][row][col] & 0x0F;
@@ -66,13 +72,13 @@ uint32_t PBox_transposition(uint32_t right)
 {
     uint32_t res = 0;
     
-    for (int i = 0; i < 32; i++)
+    for (int i = 0; i < SIZE_OF_HALF_BLOCK_BITS; i++)
     {
         //fetch the next bit according to the P box
-        int bit = (right >> (32 - P[i])) & 1;
+        int bit = (right >> (SIZE_OF_HALF_BLOCK_BITS - P[i])) & 1;
 
         //place it
-        res |= (bit << (31 - i));
+        res |= (bit << (SIZE_OF_HALF_BLOCK_BITS - 1 - i));
     }
 
     return res;

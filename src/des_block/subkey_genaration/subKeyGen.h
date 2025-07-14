@@ -1,9 +1,8 @@
 #pragma once
 
-#include <stdint.h>
+#include "../../constants.h"
 
-#define NUM_OF_SUBKEYS 16
-#define LAST_48_BITS_MASK ((1ULL << 48) - 1)
+#include <stdint.h>
 
 // PC-1: 64-bit input key → 56-bit output (C0 and D0)
 static const int PC1[56] = {

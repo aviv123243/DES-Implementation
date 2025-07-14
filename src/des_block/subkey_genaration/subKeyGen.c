@@ -6,7 +6,7 @@
 
 extern const int PC1[56];
 extern const int PC2[48];
-extern const int LEFT_SHIFTS[NUM_OF_SUBKEYS];
+extern const int LEFT_SHIFTS[16];
 
 uint64_t permuted_choice2(uint32_t Ci, uint32_t Di);
 
@@ -19,8 +19,8 @@ typedef struct subKeyGenType
 
 uint32_t circular_left_shift_28(uint32_t chunk, int nshifts)
 {
-    chunk &= 0x0FFFFFFF;
-    return ((chunk << nshifts) | (chunk >> (28 - nshifts))) & 0x0FFFFFFF;
+    chunk &= LAST_48_BITS_MASK;
+    return ((chunk << nshifts) | (chunk >> (SIZE_OF_HALF_KEY_BITS - nshifts))) & LAST_48_BITS_MASK;
 }
 
 void permuted_choice1(uint64_t key, uint32_t *Ci, uint32_t *Di)
@@ -28,28 +28,28 @@ void permuted_choice1(uint64_t key, uint32_t *Ci, uint32_t *Di)
     *Ci = 0;
     *Di = 0;
 
-    for (int i = 0; i < 28; i++)
+    for (int i = 0; i < SIZE_OF_HALF_KEY_BITS; i++)
     {
-        int bit = (key >> (64 - PC1[i])) & 1;
-        *Ci |= (bit << (27 - i));
+        int bit = (key >> (SIZE_OF_BLOCK_BITS - PC1[i])) & 1;
+        *Ci |= (bit << (SIZE_OF_HALF_KEY_BITS - 1 - i));
     }
 
-    for (int i = 0; i < 28; i++)
+    for (int i = 0; i < SIZE_OF_HALF_KEY_BITS; i++)
     {
-        int bit = (key >> (64 - PC1[i + 28])) & 1;
-        *Di |= (bit << (27 - i));
+        int bit = (key >> (SIZE_OF_BLOCK_BITS - PC1[i + SIZE_OF_HALF_KEY_BITS])) & 1;
+        *Di |= (bit << (SIZE_OF_HALF_KEY_BITS - 1 - i));
     }
 }
 
 uint64_t permuted_choice2(uint32_t Ci, uint32_t Di)
 {
-    uint64_t CD = (((uint64_t)Ci) << 28) | (Di & 0x0FFFFFFF); // combine into 56-bit
+    uint64_t CD = (((uint64_t)Ci) << SIZE_OF_HALF_KEY_BITS) | (Di & LAST_48_BITS_MASK); // combine into 56-bit
     uint64_t subkey = 0;
 
-    for (int i = 0; i < 48; i++)
+    for (int i = 0; i < SIZE_OF_SUBKEY_BITS; i++)
     {
-        int bit = (CD >> (56 - PC2[i])) & 1;
-        subkey |= ((uint64_t)bit << (47 - i));
+        int bit = (CD >> (SIZE_OF_EFFECTIVE_KEY_BITS - PC2[i])) & 1;
+        subkey |= ((uint64_t)bit << (SIZE_OF_SUBKEY_BITS - 1 - i));
     }
 
     return subkey;
@@ -92,7 +92,7 @@ int hash(uint64_t a, uint64_t b)
     return ((a % 7) == (b % 13)) ? 0 : 1;
 }
 
-void init_graph(uint64_t subkeys[NUM_OF_SUBKEYS],nodePtr nodes_out[NUM_OF_SUBKEYS])
+void init_graph(uint64_t subkeys[NUM_OF_SUBKEYS], nodePtr nodes_out[NUM_OF_SUBKEYS])
 {
     for (int i = 0; i < NUM_OF_SUBKEYS; i++)
     {
@@ -102,7 +102,7 @@ void init_graph(uint64_t subkeys[NUM_OF_SUBKEYS],nodePtr nodes_out[NUM_OF_SUBKEY
             perror("Failed to allocate node");
             for (int k = 0; k < i; k++)
                 free(nodes_out[k]);
-            
+
             exit(-1);
         }
 
@@ -120,13 +120,13 @@ void free_graph(nodePtr subkey_nodes[NUM_OF_SUBKEYS])
         free(subkey_nodes[i]);
     }
 }
- 
+
 // generate dag graph based on the keys
 // returns 1 if the dag was created and allocated properly
 // else 0;
 void generate_graph(uint64_t subkeys[NUM_OF_SUBKEYS], nodePtr nodes_out[NUM_OF_SUBKEYS])
-{   
-    init_graph(subkeys,nodes_out);
+{
+    init_graph(subkeys, nodes_out);
 
     int childCounts[NUM_OF_SUBKEYS] = {0};
 
@@ -204,7 +204,7 @@ void generate_sub_keys(uint64_t key, uint64_t subkeys[NUM_OF_SUBKEYS])
     generate_sub_keys_plain(key, plain_subkeys);
 
     generate_graph(plain_subkeys, subkey_nodes);
-   
+
     defuse_subkeys(subkeys, subkey_nodes);
 
     free_graph(subkey_nodes);

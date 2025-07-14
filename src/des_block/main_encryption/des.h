@@ -1,9 +1,6 @@
 #pragma once
 
-#define LB32_MASK 0x00000001
-#define LB64_MASK 0x0000000000000001
-#define L64_MASK 0x00000000ffffffff
-#define H64_MASK 0xffffffff00000000
+#include "../f_function/f.h"
 
 static const int IP[] = {
     58, 50, 42, 34, 26, 18, 10,  2, 
@@ -33,13 +30,5 @@ typedef enum
     DECRYPT
 } Operation;
 
-// typedef enum CipherMode
-// {
-//     ECB,
-//     CBC,
-//     CFB,
-//     OFB,
-//     CTR
-// };
 
 uint64_t des_block(uint64_t block, uint64_t subkeys[], Operation operation);
