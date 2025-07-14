@@ -1,5 +1,9 @@
 @echo off
 
+if not exist "..\bin" (
+    mkdir "..\bin"
+)
+
 gcc -shared -o ..\bin\des.dll ^
   ..\src\main.c ^
   ..\src\des_block\main_encryption\des.c ^

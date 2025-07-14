@@ -1,4 +1,7 @@
 
+if not exist "..\bin" (
+    mkdir "..\bin"
+)
 
 gcc ^
   ..\src\main.c ^
