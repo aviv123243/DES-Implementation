@@ -1,117 +1,97 @@
-# DES Encryption Suite
+DES Encryption Suite
+A full-featured DES encryption system implemented in C with a cross-platform Python GUI frontend. Supports multiple cipher modes, string and file encryption, and DLL-based interoperability with Python.
 
-A full-featured Data Encryption Standard (DES) implementation in C, with a cross-platform Python GUI frontend. Supports multiple cipher modes, string and file encryption, DLL integration, and key generation.
-
----
-
-## 🗂 Project Structure
-
+🗂 Project Structure
 .
-├── .idea/                  # JetBrains IDE config
+├── .idea/                   # JetBrains IDE config
 ├── .vscode/                # VS Code settings
 ├── app/                    # Python GUI app
 │   └── gui.py
-├── scripts/                # Build & run scripts
-│   ├── des.def
-│   ├── libdes.a
+├── bin/                    # Compiled binaries (DLL, EXE)
+│   ├── des.dll
+│   └── out.exe
+├── build/                  # Build scripts and intermediate files
 │   ├── make.bat
-│   ├── makeDump.bat
 │   ├── make_dll.bat
-│   └── run.bat
+│   ├── makeDump.bat
+│   ├── run.bat
+│   ├── des.def
+│   └── libdes.a
 ├── src/                    # C source code
-│   ├── constants.h
 │   ├── main.c
+│   ├── constants.h
 │   ├── des_block/
 │   │   ├── f_function/
 │   │   ├── main_encryption/
 │   │   └── subkey_genaration/
-│   ├── key_iv/
 │   ├── modes/
+│   ├── key_iv/
 │   └── pkcs7_padding/
-├── test/                   # Sample files for testing
-│   ├── plaintext.txt
-│   ├── ciphertext.txt
-│   └── decoded.txt
-└── bin/                    # Compiled outputs (ignored by Git)
-    ├── des.dll
-    └── out.exe
+└── test/                   # Test input/output files
+    ├── plaintext.txt
+    ├── ciphertext.txt
+    └── decoded.txt
 
----
 
-## 🔐 Features
+🔐 Features
 
-- Full DES block cipher (64-bit block, 16 rounds)
-- Modes: ECB, CBC, PCBC, CFB, OFB, CTR
-- File and string encryption/decryption
-- Manual or random 64-bit key input
-- DLL compiled for use with Python via ctypes
-- Lightweight Python GUI with mode selector and key entry
+Full DES block cipher (64-bit block, 16 rounds) in C
+Modes: ECB, CBC, PCBC, CFB, OFB, CTR
+File and string encryption/decryption
+Python GUI with mode selection and key management
+DLL built with MinGW for seamless Python integration via ctypes
+Manual or random 64-bit key input with C-side secure PRNG
 
----
 
-## 🛠 Build Instructions
+🛠 Build Instructions
+Requirements
 
-### Requirements
+MinGW-w64 (x64, POSIX/SEH recommended)
 
-- MinGW-w64 (64-bit, POSIX, SEH recommended)
-
-### Build DLL & Executable
-
-cd scripts
+Build DLL & Executable
+cd build
 make_dll.bat    # Creates bin/des.dll
 make.bat        # Creates bin/out.exe (for testing)
 
-Optional: run.bat to execute out.exe.
+Optional: Run run.bat to execute out.exe.
 
----
+▶️ Run GUI
+Prerequisites
 
-## ▶️ Run GUI
+Python 3.x
+tkinter (usually preinstalled with Python)
 
-### Prerequisites
-
-- Python 3.x
-- Tkinter (usually preinstalled)
-
-### Launch
-
+Run
 cd app
 python gui.py
 
----
 
-## 🧪 Testing
+🧪 Testing
+Use the files in test/ to verify encryption/decryption:
 
-Test the DES system with sample data:
+plaintext.txt: Input file
+ciphertext.txt: Output after encryption
+decoded.txt: Output after decryption
 
-- test/plaintext.txt → encrypted to → test/ciphertext.txt
-- test/ciphertext.txt → decrypted to → test/decoded.txt
+Test automatically via main.c or interactively through the GUI.
 
-You can test this automatically via main.c or interactively through the GUI.
+💡 Notes
 
----
+DES key must be 64-bit (16 hex characters)
+Random key generation available via GUI ("Random" button) or C-side PRNG
+All cryptographic computation performed in native C for performance
+GUI serves as a lightweight wrapper over the DLL for usability
 
-## 💡 Notes
 
-- DES key must be 64 bits (entered as 16 hex characters)
-- Random key generation uses C-side secure PRNG
-- All cryptographic computation is in native C for performance
-- GUI is a thin wrapper over the DLL for usability
+✨ Credits
+Created by Aviv EshFeatures a custom DES implementation with:
 
----
+F-function, S-boxes, expansion, and permutations
+Key schedule (PC-1, shifts, PC-2)
+Block cipher chaining modes
+PKCS#7 padding
+Clean C and Python integration via DLL
 
-## ✨ Credits
 
-Developed by Aviv Esh
-
-- Custom DES implementation with:
-  - F-function, S-boxes, expansion, permutations
-  - Key schedule (PC-1, shifts, PC-2)
-  - Block cipher chaining modes
-  - PKCS#7 padding
-- Clean integration between C and Python via DLL
-
----
-
-## 📜 License
-
-MIT License 
+📜 License
+MIT License
